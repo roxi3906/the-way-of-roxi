@@ -1,0 +1,4 @@
+interface:
+  display_name: "Roxi's Way"
+  short_description: "Follow Roxi's delivery and communication rules"
+  default_prompt: "Use $roxis-way to implement this task following Roxi's communication, testing, and PR rules."
