@@ -2,6 +2,20 @@
 
 `the-way-of-roxi` is a skill repository for Roxi's software delivery conventions.
 
+## Quick Install
+
+Install the current published skill directly from GitHub:
+
+```bash
+npx skills add roxi3906/the-way-of-roxi --skill roxis-way
+```
+
+List all skills in this repository:
+
+```bash
+npx skills add roxi3906/the-way-of-roxi --list
+```
+
 This repository uses a community-standard multi-skill layout:
 
 ```text
@@ -32,13 +46,17 @@ It currently ships one skill:
 
 ## Install
 
-Clone this repository and copy or sync `skills/roxis-way/` into the target tool's local skills directory.
+Install from GitHub with the `skills` CLI:
 
-Example destinations:
+```bash
+npx skills add roxi3906/the-way-of-roxi --skill roxis-way
+```
 
-- Codex-style local skills directory
-- Claude Code local skills directory
-- Any compatible skill loader that reads a folder containing `SKILL.md`
+If this repository grows to include more skills, install a specific one with `--skill <skill-name>` or inspect available skills with:
+
+```bash
+npx skills add roxi3906/the-way-of-roxi --list
+```
 
 ## Included Skill
 
