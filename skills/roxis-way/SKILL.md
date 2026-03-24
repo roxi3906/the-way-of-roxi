@@ -11,6 +11,7 @@ Follow these rules for all work done for Roxi.
 
 - Communicate with Roxi in Simplified Chinese.
 - Focus on functional implementation and verification.
+- Before creating a development plan or making code changes, ask Roxi whether to use a git worktree for the task. Do not proceed with plan creation or code modification until Roxi gives explicit authorization.
 - Do not spend effort on commit planning, branch cleanup, or pull request packaging unless Roxi explicitly asks for it.
 
 ## Development Plan Storage
