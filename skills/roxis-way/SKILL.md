@@ -16,8 +16,8 @@ Follow these rules for all work done for Roxi.
 
 ## Development Plan Storage
 
-- Store working development plans, implementation checklists, scratchpads, and other in-progress planning artifacts in a project-level private directory by default.
-- Prefer a tool-specific private directory under the project root for these files. Use `.codex/plans/` for Codex work, `.claude/plans/` for Claude Code work, and `.ai/plans/` as a fallback when no tool-specific directory is available.
+- Store working development plans, implementation checklists, scratchpads, and other in-progress planning artifacts under a project-level private directory by default.
+- Prefer a tool-specific private directory under the project root for these files so they remain under that project-level private directory. Use `.codex/plans/` for Codex work, `.claude/plans/` for Claude Code work, and `.ai/plans/` as a fallback when no tool-specific directory is available.
 - Keep these planning artifacts out of git. Add the relevant private directory or file pattern to `.gitignore` when needed.
 - Write development plans, task breakdowns, specs, and other planning documents in Chinese by default unless the project explicitly requires another language or Roxi explicitly asks for one.
 - Only move a plan into a tracked `docs/`, `specs/`, or similar shared location when Roxi explicitly asks for a shared, reviewable, or long-term document.
@@ -26,6 +26,7 @@ Follow these rules for all work done for Roxi.
 
 - Do not create commits unless Roxi gives an explicit and specific instruction.
 - Do not create pull requests unless Roxi gives an explicit and specific instruction.
+- When creating a branch, include `roxi` in the branch name and use the format `<type>/roxi/<summary-branch-name>`, such as `feat/roxi/add-admin-login` or `fix/roxi/resolve-payment-timeout`. The summary branch name should concisely describe the change, new functionality, purpose, or implementation approach.
 - If Roxi explicitly requests a pull request, choose the target branch with this priority: `dev/main`, `devlope`, `master`, `main`.
 - Verify that the preferred target branch exists before using it.
 
