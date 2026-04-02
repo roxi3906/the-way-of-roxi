@@ -1,4 +1,4 @@
 interface:
   display_name: "Roxi's Way"
-  short_description: "Follow Roxi's delivery and communication rules"
-  default_prompt: "Use $roxis-way to implement this task following Roxi's communication, testing, and PR rules."
+  short_description: "Follow Roxi's delivery, communication, and code comment rules"
+  default_prompt: "Use $roxis-way to implement this task following Roxi's communication, testing, PR, and code comment rules. Add comments only for code written in the current task, and do not treat untouched existing code as requiring comment rewrites. Add comments for each logical block you write, use brief responsibility-focused comments for simple logic and more detailed comments for complex logic, follow the file's dominant existing comment language or the nearest surrounding comment style when clear, default to Chinese when it is not, and avoid comments that only restate the code."

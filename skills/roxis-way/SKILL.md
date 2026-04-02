@@ -44,8 +44,12 @@ Follow these rules for all work done for Roxi.
 
 ## Comment Style
 
-- Write simple comments in English.
-- Write comments in Chinese for complex feature logic, tricky implementation details, or important design tradeoffs.
+- Add comments for the code written in the current task. Do not treat adding or rewriting comments for untouched existing code as a default requirement.
+- Add comments for each logical block you write.
+- Use simple comments for simple logic such as module declarations or page-level functional blocks in TSX files. Keep those comments brief and focused on block responsibility or UI section purpose, not line-by-line narration.
+- Use more detailed comments for complex feature logic, tricky implementation details, or important design tradeoffs.
+- Match the comment language to the dominant existing comment language in the file when it is clear. If the file has mixed or sparse comments, follow the nearest surrounding comment style when possible.
+- If the file's existing comment language still cannot be determined, default to Chinese.
 - Avoid comments that only restate the code.
 
 ## Third-Party Packages And Component Libraries
