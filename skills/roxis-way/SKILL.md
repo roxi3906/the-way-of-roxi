@@ -26,9 +26,13 @@ Follow these rules for all work done for Roxi.
 
 - Do not create commits unless Roxi gives an explicit and specific instruction.
 - Do not create pull requests unless Roxi gives an explicit and specific instruction.
+- If a test file is ignored by git but Roxi explicitly wants it included in a commit, stage that specific file with a one-off forced add such as `git add -f <file>` instead of modifying `.gitignore`.
 - When creating a branch, include `roxi` in the branch name and use the format `<type>/roxi/<summary-branch-name>`, such as `feat/roxi/add-admin-login` or `fix/roxi/resolve-payment-timeout`. The summary branch name should concisely describe the change, new functionality, purpose, or implementation approach.
-- If Roxi explicitly requests a pull request, choose the target branch with this priority: `dev/main`, `devlope`, `master`, `main`.
-- Verify that the preferred target branch exists before using it.
+- If Roxi explicitly requests a pull request, treat the default target branch as the current branch's source branch rather than choosing a fixed default branch immediately.
+- Check the likely source branch before creating the pull request. Use `git rev-parse --abbrev-ref --symbolic-full-name @{upstream}` to inspect the current branch's upstream branch, and use `git merge-base --fork-point <candidate-branch> HEAD` when needed to verify a likely source branch.
+- Before creating the pull request, prepare the viable merge target branches and submit the recommended target together with the alternatives to Roxi for explicit selection and authorization.
+- If the source branch cannot be determined reliably or is unavailable, fall back to this target branch priority: `dev/main`, `devlope`, `master`, `main`.
+- Verify that the selected target branch exists before using it.
 
 ## Product Language Defaults
 
