@@ -68,3 +68,11 @@ Follow these rules for all work done for Roxi.
 - If e2e tests fail, investigate the issue, implement fixes, and rerun the tests before reporting back.
 - Report completion to Roxi only after the e2e checks pass, or after a concrete blocker has been isolated and explained clearly.
 - If the project has no e2e test setup, use the closest available end-to-end or integration validation path and state that choice in the report.
+- Only trigger the following Docker Compose build workflow when Roxi explicitly asks to build with `docker compose` or Compose.
+- Step 1: Search the repository for available Compose file paths and present all viable options to Roxi for explicit selection.
+- Step 2: After Roxi selects the Compose file, ask Roxi which `service` entries should be built. Do not decide the target services without explicit confirmation.
+- Step 3: After the target `service` entries are confirmed, review the `.env`-managed environment variables used by those services and ask Roxi whether any values need to be changed before the build.
+- Step 4: Before starting the build, ask Roxi whether the build should use cache.
+- Step 5: Do not start the build until the Compose file, target services, required environment variable changes, and cache preference are all confirmed.
+- Step 6: Before rebuilding the selected services, remove the existing images for those services and then run a clean build from scratch according to Roxi's cache preference.
+- Step 7: After the build completes, present the container or service network access addresses for the built services.
