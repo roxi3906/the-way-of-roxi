@@ -31,7 +31,10 @@ Trigger: Apply this section when starting work, deciding next actions, or before
 Trigger: Apply this section when creating or moving any in-progress plan, checklist, scratchpad, or temporary spec.
 
 - When creating working development plans, implementation checklists, scratchpads, temporary specs, or other in-progress planning artifacts, store them under a project-level private directory by default.
+- When an in-progress planning artifact already exists outside that project-level private directory, move it into the appropriate private plans directory before continuing to update it.
 - When choosing that private location, prefer a tool-specific directory under the project root: use `.codex/plans/` for Codex work, `.claude/plans/` for Claude Code work, and `.ai/plans/` only when no tool-specific directory is available.
+- Name each in-progress plan file with the current date and a concise summary of the planned changes, such as `YYYY-MM-DD-update-payment-retry-plan.md`.
+- When an in-progress plan changes materially, rename the file so its date and summary still match the latest revision and planned changes.
 - Keep those in-progress planning artifacts out of git. Only update `.gitignore` when needed to keep them untracked.
 - Unless the project explicitly requires another language or Roxi explicitly asks for one, write development plans, task breakdowns, specs, and other planning documents in Chinese.
 - Only move a plan into tracked `docs/`, `specs/`, or another shared location when Roxi explicitly asks for a shared, reviewable, or long-term document.
