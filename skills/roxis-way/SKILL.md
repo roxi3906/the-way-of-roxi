@@ -10,20 +10,30 @@ Follow these rules for all work done for Roxi.
 ## Hard Rules
 
 - When this skill applies, use Simplified Chinese for replies to Roxi.
-- When work may create a plan or modify the repository, ask whether to use a git worktree before proceeding.
+- When work may create a plan, modify the repository, or require completion validation, ask Roxi to choose the workspace and validation strategy with numbered quick-reply lists before starting task execution.
 - Only create commits or pull requests after Roxi gives an explicit instruction for that exact action.
 - Only move in-progress plans into tracked shared docs when Roxi explicitly asks for a shared or long-term document.
 - When product-facing language is unspecified, default only user-facing product text to English.
-- Before reporting completion, run the required e2e or closest substitute validation.
+- Before reporting completion, run the selected e2e or closest substitute validation; if Roxi selected "Other" for validation without details, choose the coverage scope based on risk and state that choice.
 
 ## Collaboration
 
-Trigger: Apply this section when starting work, deciding next actions, or before any planning or repository modification.
+Trigger: Apply this section when starting work, deciding next actions, before task execution, before choosing workspace strategy, before choosing validation strategy, or before any planning or repository modification.
 
 - When replying to Roxi in this repository, communicate in Simplified Chinese.
 - Prioritize functional implementation and verification over commit packaging, branch cleanup, or presentation work.
-- When the task may require any planning artifact or any repository change, ask Roxi whether to use a git worktree before proceeding.
-- Only create plans or modify code, config, tests, generated files, or any other repository content after Roxi explicitly authorizes the worktree decision or explicitly tells you not to use one.
+- When the task may require any planning artifact, repository change, implementation, fix, refactor, behavior change, test change, or other development work, stop before planning, editing, or task execution and ask Roxi to choose the required start strategies with numbered quick-reply lists.
+- The workspace strategy prompt MUST be easy to answer with one number and MUST include an "Other" option:
+  1. Use a git worktree: isolate the task in a separate checkout so unrelated current-workspace changes stay untouched.
+  2. Create a separate branch in the current workspace: keep the same directory, but separate the task history from the current branch.
+  3. Continue on the current branch without a git worktree: use the existing branch and workspace for the task.
+  4. Other: describe the preferred workspace or branch strategy.
+- When the task may require completion validation, the start prompt MUST also ask Roxi to choose the e2e or substitute validation coverage before execution begins. The coverage prompt MUST be easy to answer with one number, MUST use this order, and MUST include an "Other" option:
+  1. Directly related functional tests: validate business behavior directly touched by the change, component wrappers/usages/importers directly connected to the changed code, and direct logic or data-flow paths.
+  2. Indirectly related functional tests: also validate derived data, derived state, downstream display, or behavior that depends on the changed paths.
+  3. Full test suite: run the full available e2e or closest substitute validation suite.
+  4. Other: describe the desired test scope or command; if Roxi selects this without providing details, choose the coverage scope based on implementation risk and explain the choice before running validation.
+- Only create plans or modify code, config, tests, generated files, or any other repository content after Roxi explicitly selects or describes the required start strategies.
 - Unless Roxi explicitly asks for it, do not spend effort on commit planning, branch cleanup, or pull request packaging.
 
 ## Development Plan Storage
@@ -94,9 +104,13 @@ Trigger: Apply this section when introducing or integrating a third-party packag
 
 ## Delivery Workflow
 
-Trigger: Apply this section when development work is complete or when Roxi explicitly asks for a `docker compose` build.
+Trigger: Apply this section when development work is complete, after any implementation/fix/refactor step is ready for validation, before running the initially selected e2e or substitute validation scope, or when Roxi explicitly asks for a `docker compose` build.
 
-- When development work is complete, run the project's e2e tests before reporting completion.
+- Unit tests are usually fast; when relevant unit tests exist, run the directly relevant unit tests without asking Roxi to choose a scope first.
+- Before running e2e tests or the closest substitute validation, summarize what was completed in the immediately preceding development step and state the validation scope selected at task start.
+- The pre-validation summary MUST mention changed user behavior, affected business paths, changed components or modules, and important direct data or state flow changes when applicable.
+- Do not ask Roxi to choose the e2e or substitute validation coverage again unless no start-of-task scope exists or the implementation materially broadened the risk beyond the selected scope.
+- When development work is complete, run the initially selected e2e tests or closest substitute validation before reporting completion.
 - If the project has no e2e test setup, use the closest available end-to-end or integration validation path and state that substitution in the report.
 - If e2e or substitute validation fails, investigate the issue, implement fixes, and rerun the relevant validation before reporting back.
 - Only report completion to Roxi after the required validation passes, or after a concrete blocker has been isolated and explained clearly.
