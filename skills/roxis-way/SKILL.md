@@ -11,6 +11,7 @@ Follow these rules for all work done for Roxi.
 
 - When this skill applies, use Simplified Chinese for replies to Roxi.
 - When work may create a plan, modify the repository, or require completion validation, ask Roxi to choose the workspace and validation strategy with numbered quick-reply lists before starting task execution.
+- Before asking Roxi to choose the workspace strategy, check whether local branches or git worktree branches already match the task and present any matches as ranked options.
 - Only create commits or pull requests after Roxi gives an explicit instruction for that exact action.
 - Only move in-progress plans into tracked shared docs when Roxi explicitly asks for a shared or long-term document.
 - When product-facing language is unspecified, default only user-facing product text to English.
@@ -22,8 +23,12 @@ Trigger: Apply this section when starting work, deciding next actions, before ta
 
 - When replying to Roxi in this repository, communicate in Simplified Chinese.
 - Prioritize functional implementation and verification over commit packaging, branch cleanup, or presentation work.
+- Before asking Roxi to choose a workspace strategy, inspect local branches and branches already checked out in git worktrees. Compare those branch names with Roxi's task description using concrete identifiers from the request, such as feature names, bug IDs, ticket numbers, product areas, module names, and meaningful keywords.
+- When Roxi's task describes a pull request, PR URL, PR number, or PR conflict resolution, inspect the PR metadata before ranking workspace candidates. Use the PR head branch as the strongest match key, the base branch as required conflict context, and the PR title or description as secondary keywords. If the head branch exists in a local branch or git worktree, rank that exact match first. If the head branch only exists as a remote-tracking branch, present it as a candidate that would require creating or checking out a local workspace. If the PR comes from a fork, present the fork owner and head ref and state that fetching the fork branch may be required before work can start.
+- If any local branch or git worktree branch plausibly matches Roxi's task, include those candidates in the workspace strategy prompt before the standard generic options. Sort them from highest to lowest relevance, and show enough context for each candidate to choose confidently: branch name, whether it is in the current workspace or another git worktree, and the worktree path when applicable.
+- Do not automatically switch to, reuse, create from, or modify a matched branch. Present the ranked candidates as numbered choices and wait for Roxi's explicit selection or a described alternative.
 - When the task may require any planning artifact, repository change, implementation, fix, refactor, behavior change, test change, or other development work, stop before planning, editing, or task execution and ask Roxi to choose the required start strategies with numbered quick-reply lists.
-- The workspace strategy prompt MUST be easy to answer with one number and MUST include an "Other" option:
+- The workspace strategy prompt MUST be easy to answer with one number and MUST include an "Other" option. When no task-matching branch candidates exist, use these standard options:
   1. Use a git worktree: isolate the task in a separate checkout so unrelated current-workspace changes stay untouched.
   2. Create a separate branch in the current workspace: keep the same directory, but separate the task history from the current branch.
   3. Continue on the current branch without a git worktree: use the existing branch and workspace for the task.
