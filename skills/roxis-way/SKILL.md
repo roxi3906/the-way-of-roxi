@@ -1,6 +1,6 @@
 ---
 name: roxis-way
-description: Use when working in a Roxi-owned repository or when a task must follow Roxi-specific rules for reply language, worktree authorization, private plan storage, commit and pull request authorization, branch naming, pull request target selection, product language defaults, code comment language, third-party integration choices, or delivery validation.
+description: Use when working in a Roxi-owned repository or when a task must follow Roxi-specific rules for reply language, worktree authorization, private plan storage, commit and pull request authorization, branch naming, pull request target selection, product language defaults, code comment triggers, code comment language, third-party integration choices, or delivery validation.
 ---
 
 # Roxi's Way
@@ -88,9 +88,10 @@ Trigger: Apply this section when writing or editing frontend code.
 
 ## Comment Style
 
-Trigger: Apply this section when adding or substantially rewriting code in the current task.
+Trigger: Apply this section when writing, editing, adding, or substantially rewriting code in the current task; when the task involves code comments, comment cleanup, comment language, readability, confusing code, or hard-to-read code; or when generating code snippets that are intended to be used in a repository.
 
 - When you write code in the current task, add comments for the logical blocks you introduce or substantially rewrite.
+- When writing code, add comments for important, easy-to-confuse, or hard-to-read code paths.
 - Only comment untouched existing code when Roxi explicitly asks for comment-only cleanup or the untouched code must be explained to make your new code understandable.
 - When the logic is simple, keep the comment brief and focused on block responsibility or UI section purpose rather than line-by-line narration.
 - When the logic involves tricky behavior, feature rules, implementation constraints, or important tradeoffs, add a more detailed comment that explains the non-obvious part.
