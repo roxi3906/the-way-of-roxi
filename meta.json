@@ -5,7 +5,7 @@
   "install_url": "https://github.com/roxi3906/the-way-of-roxi",
   "name": "roxis-way",
   "repo_url": "https://github.com/roxi3906/the-way-of-roxi",
-  "skill_path": "roxis-way",
+  "skill_path": "skills/roxis-way",
   "source": "local",
   "tags": [],
   "version": "1.0"
