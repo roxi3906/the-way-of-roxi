@@ -1,6 +1,6 @@
 ---
 name: roxis-way
-description: Use when working in a Roxi-owned repository or when a task must follow Roxi-specific rules for reply language, worktree authorization, private plan storage, commit and pull request authorization, branch naming, pull request target selection, product language defaults, code comment triggers, code comment language, third-party integration choices, or delivery validation.
+description: Use when working in a Roxi-owned repository or when a task must follow Roxi-specific rules for reply language, worktree authorization, private plan storage, commit and pull request authorization, branch naming, pull request target selection, pull request title or body drafting, product language defaults, code comment triggers, code comment language, third-party integration choices, or delivery validation.
 ---
 
 # Roxi's Way
@@ -56,7 +56,7 @@ Trigger: Apply this section when creating or moving any in-progress plan, checkl
 
 ## Commit And PR Constraints
 
-Trigger: Apply this section when committing, naming branches, force-adding ignored files, choosing a PR target, or preparing a pull request.
+Trigger: Apply this section when committing, naming branches, force-adding ignored files, choosing a PR target, drafting a PR title or body, or preparing a pull request.
 
 - Only create a commit when Roxi gives an explicit instruction to commit the current work. Do not treat phrases such as "wrap this up," "ship it," or other indirect wording as commit authorization.
 - Only create a pull request when Roxi gives an explicit instruction to create a pull request. Do not infer pull request authorization from general completion requests.
@@ -68,6 +68,16 @@ Trigger: Apply this section when committing, naming branches, force-adding ignor
 - Before creating the pull request, prepare the viable merge target branches and submit the recommended target together with the alternatives to Roxi for explicit selection and authorization.
 - Only fall back to this target branch priority when the source branch cannot be determined reliably or does not exist: `dev/main`, `devlope`, `master`, `main`.
 - Verify that Roxi's selected target branch exists before using it.
+- When drafting a pull request title, write it in English and use a standard conventional commit style, such as `feat: add admin login` or `fix: resolve payment timeout`.
+- When drafting a pull request body, write it in Chinese unless Roxi explicitly requests another language.
+- Structure the pull request body with standard sections for `总结`, `要点`, `影响范围`, `测试结果`, and `潜在问题`.
+- In the summary section, describe the change as functional outcomes or business-facing behavior rather than a plain code-file or implementation checklist.
+- Use the `要点` section for concise supporting points, but do not make the whole pull request body a direct list of code edits.
+- Include an `影响范围` section that explains affected user flows, business paths, modules, data or state flows, integrations, and operational concerns when applicable.
+- If related pull requests exist, include them in a separate `关联 PR` section with each pull request's title or purpose and link.
+- Automatically identify and mention relevant authors from commits, PR metadata, or changed work when that information is available.
+- Associate relevant assignees with the pull request when assignee information is available.
+- Include a separate `作者` section at the bottom of the pull request body.
 
 ## Product Language Defaults
 
