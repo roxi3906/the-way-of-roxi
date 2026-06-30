@@ -72,7 +72,11 @@ Trigger: Apply this section when committing, naming branches, force-adding ignor
 - When drafting a pull request body, write it in Chinese unless Roxi explicitly requests another language.
 - Structure the pull request body with standard sections for `总结`, `要点`, `影响范围`, `测试结果`, and `潜在问题`.
 - In the summary section, describe the change as functional outcomes or business-facing behavior rather than a plain code-file or implementation checklist.
-- Use the `要点` section for concise supporting points, but do not make the whole pull request body a direct list of code edits.
+- Use the `要点` section only for concise product-facing changes introduced by the PR. Each bullet must describe changed user or product behavior, entry points, naming, URLs, discoverability, compatibility, business capability, data behavior, integrations, or operationally relevant outcomes.
+- Do not include unchanged existing functionality, tests, builds, lint, validation, file moves, component names, internal refactors, config edits, or implementation mechanics in `要点`; place those in `测试结果`, `影响范围`, or `潜在问题` when relevant.
+- For merge or release pull requests, write `要点` bullets about the product changes being released, not merge mechanics, source branches, target branches, commit plumbing, or repository synchronization.
+- If a technical change has no direct product-facing effect, omit it from `要点` unless it affects compatibility, discoverability, user access, data behavior, integrations, or operations.
+- Avoid `要点` bullets that merely say a page or flow continues to support existing content or behavior. Preserve unchanged scope in `影响范围` when needed.
 - Include an `影响范围` section that explains affected user flows, business paths, modules, data or state flows, integrations, and operational concerns when applicable.
 - If related pull requests exist, include them in a separate `关联 PR` section with each pull request's title or purpose and link.
 - Automatically identify and mention relevant authors from commits, PR metadata, or changed work when that information is available.
