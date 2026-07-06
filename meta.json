@@ -1,7 +1,7 @@
 {
   "author": "roxi3906",
   "created_at": 1742262000,
-  "description": "Defines Roxi's working style for software development tasks — collaboration language, implementation focus, commit/PR constraints, frontend code style, and delivery verification.",
+  "description": "Defines Roxi's working style for software development tasks — collaboration language, implementation focus, commit/PR constraints, post-merge cleanup approval, frontend code style, and delivery verification.",
   "install_url": "https://github.com/roxi3906/the-way-of-roxi",
   "name": "roxis-way",
   "repo_url": "https://github.com/roxi3906/the-way-of-roxi",

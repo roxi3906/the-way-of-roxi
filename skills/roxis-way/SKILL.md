@@ -1,6 +1,6 @@
 ---
 name: roxis-way
-description: Use when working in a Roxi-owned repository or when a task must follow Roxi-specific rules for reply language, worktree authorization, private plan storage, commit and pull request authorization, branch naming, pull request target selection, pull request title or body drafting, product language defaults, code comment triggers, code comment language, third-party integration choices, or delivery validation.
+description: Use when working in a Roxi-owned repository or when a task must follow Roxi-specific rules for reply language, worktree authorization, private plan storage, commit and pull request authorization, branch naming, pull request target selection, pull request title or body drafting, post-merge cleanup approval, product language defaults, code comment triggers, code comment language, third-party integration choices, or delivery validation.
 ---
 
 # Roxi's Way
@@ -13,6 +13,8 @@ Follow these rules for all work done for Roxi.
 - When work may create a plan, modify the repository, or require completion validation, ask Roxi to choose the workspace and validation strategy with numbered quick-reply lists before starting task execution.
 - Before asking Roxi to choose the workspace strategy, check whether local branches or git worktree branches already match the task and present any matches as ranked options.
 - Only create commits or pull requests after Roxi gives an explicit instruction for that exact action.
+- Before cleanup after a pull request has been merged, prepare a cleanup plan that lists the PR development contents involved and the exact cleanup script or commands, then submit them to Roxi for review before execution.
+- During post-merge PR cleanup, only touch items and run commands that were included in Roxi's reviewed cleanup plan.
 - Only move in-progress plans into tracked shared docs when Roxi explicitly asks for a shared or long-term document.
 - When product-facing language is unspecified, default only user-facing product text to English.
 - Before reporting completion, run the selected e2e or closest substitute validation; if Roxi selected "Other" for validation without details, choose the coverage scope based on risk and state that choice.
@@ -82,6 +84,17 @@ Trigger: Apply this section when committing, naming branches, force-adding ignor
 - Automatically identify and mention relevant authors from commits, PR metadata, or changed work when that information is available.
 - Associate relevant assignees with the pull request when assignee information is available.
 - Include a separate `作者` section at the bottom of the pull request body.
+
+## Post-Merge Cleanup Constraints
+
+Trigger: Apply this section when cleaning up after a pull request has been merged, including deleting branches, removing worktrees, pruning local files, deleting temporary artifacts, archiving or renaming related threads, or running any cleanup script for that PR.
+
+- Before cleanup, prepare a cleanup plan for Roxi's review. The plan MUST list the PR development contents that make cleanup relevant, including the PR identifier or branch when available, local branches, worktrees, temporary planning artifacts, generated files, scripts, commands, and repository files that the PR work created, modified, or used.
+- Include the exact cleanup script or command sequence with the cleanup plan, and wait for Roxi's explicit approval before executing it.
+- The cleanup plan MUST identify each item as delete, keep, archive, move, or leave untouched, and explain why that action belongs to this PR's cleanup.
+- During cleanup, only act on items and commands included in the reviewed cleanup plan. Do not delete, move, reset, prune, archive, or otherwise modify any branch, worktree, file, thread, automation, or artifact outside the approved plan.
+- If cleanup reveals new items or requires different commands, stop and submit an updated cleanup plan and script for Roxi's review before continuing.
+- After cleanup, report which planned items were completed and any approved items left unchanged.
 
 ## Product Language Defaults
 
