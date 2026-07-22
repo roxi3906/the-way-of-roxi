@@ -64,7 +64,7 @@ npx skills add roxi3906/the-way-of-roxi --list
 
 - Collaboration language
 - Planning artifact placement
-- Commit and PR constraints
+- Git conventions and PR authorization
 - Post-merge PR cleanup approval and scope limits
 - Product language defaults
 - Frontend coding style
