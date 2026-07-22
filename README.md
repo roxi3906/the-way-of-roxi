@@ -1,6 +1,6 @@
 # The Way of Roxi
 
-`the-way-of-roxi` is a skill repository for Roxi's software delivery conventions.
+`the-way-of-roxi` is a reusable skill repository for user-configured software delivery conventions.
 
 ## Quick Install
 
@@ -29,7 +29,7 @@ skills/<skill-name>/
 
 It currently ships one skill:
 
-- `skills/roxis-way/`: Roxi's collaboration, implementation, testing, language, and delivery rules.
+- `skills/roxis-way/`: Reusable collaboration, implementation, testing, language, and delivery rules for any user.
 
 ## Repository Layout
 
