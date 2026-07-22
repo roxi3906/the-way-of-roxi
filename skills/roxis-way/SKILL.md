@@ -1,6 +1,6 @@
 ---
 name: roxis-way
-description: Use when working in a Roxi-owned repository or when a task must follow Roxi-specific rules for reply language, worktree authorization, private plan storage, commit and pull request authorization, branch naming, pull request target selection, pull request title or body drafting, post-merge cleanup approval, product language defaults, code comment triggers, code comment language, third-party integration choices, or delivery validation.
+description: Use when working in a Roxi-owned repository or when a task must follow Roxi-specific rules for reply language, worktree authorization, private plan storage, Git workflow conventions, pull request authorization, branch naming, pull request target selection, pull request title or body drafting, post-merge cleanup approval, product language defaults, code comment triggers, code comment language, third-party integration choices, or delivery validation.
 ---
 
 # Roxi's Way
@@ -12,7 +12,7 @@ Follow these rules for all work done for Roxi.
 - When this skill applies, use Simplified Chinese for replies to Roxi.
 - When work may create a plan, modify the repository, or require completion validation, ask Roxi to choose the workspace and validation strategy with numbered quick-reply lists before starting task execution.
 - Before asking Roxi to choose the workspace strategy, check whether local branches or git worktree branches already match the task and present any matches as ranked options.
-- Only create commits or pull requests after Roxi gives an explicit instruction for that exact action.
+- Only create pull requests after Roxi gives an explicit instruction for that exact action.
 - Before cleanup after a pull request has been merged, prepare a cleanup plan that lists the PR development contents involved and the exact cleanup script or commands, then submit them to Roxi for review before execution.
 - During post-merge PR cleanup, only touch items and run commands that were included in Roxi's reviewed cleanup plan.
 - Only move in-progress plans into tracked shared docs when Roxi explicitly asks for a shared or long-term document.
@@ -56,11 +56,10 @@ Trigger: Apply this section when creating or moving any in-progress plan, checkl
 - Unless the project explicitly requires another language or Roxi explicitly asks for one, write development plans, task breakdowns, specs, and other planning documents in Chinese.
 - Only move a plan into tracked `docs/`, `specs/`, or another shared location when Roxi explicitly asks for a shared, reviewable, or long-term document.
 
-## Commit And PR Constraints
+## Git And PR Conventions
 
 Trigger: Apply this section when committing, naming branches, force-adding ignored files, choosing a PR target, drafting a PR title or body, or preparing a pull request.
 
-- Only create a commit when Roxi gives an explicit instruction to commit the current work. Do not treat phrases such as "wrap this up," "ship it," or other indirect wording as commit authorization.
 - Only create a pull request when Roxi gives an explicit instruction to create a pull request. Do not infer pull request authorization from general completion requests.
 - When Roxi explicitly asks to include an ignored file in a commit, force-add only that file, such as with `git add -f <file>`. Do not modify `.gitignore` unless Roxi explicitly asks to change ignore rules.
 - When a new branch must be created and Roxi has not provided a branch name, include `roxi` in the branch name and use the format `<type>/roxi/<summary-branch-name>`, such as `feat/roxi/add-admin-login` or `fix/roxi/resolve-payment-timeout`.
