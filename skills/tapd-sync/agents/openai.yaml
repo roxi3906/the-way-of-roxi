@@ -1,4 +1,6 @@
 interface:
   display_name: "TAPD Sync"
-  short_description: "Sync session work with configured TAPD items"
-  default_prompt: "Use $tapd-sync to match this session with TAPD work items and keep valuable follow-up work synchronized."
+  short_description: "Sync every substantive work session with TAPD"
+  default_prompt: "Use $tapd-sync to match this work session with TAPD and maintain valuable follow-up work."
+policy:
+  allow_implicit_invocation: true
