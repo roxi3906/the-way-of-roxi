@@ -28,6 +28,8 @@ skills/<skill-name>/
   assets/
 ```
 
+The `tapd-sync` skill follows the open Agent Skills specification. The `skills` CLI maps the same canonical skill into the discovery location supported by the selected compatible agent, so this repository does not maintain vendor-specific copies.
+
 It currently ships two skills:
 
 - `skills/roxis-way/`: Reusable collaboration, implementation, testing, language, and delivery rules for any user.
@@ -81,11 +83,13 @@ npx skills add roxi3906/the-way-of-roxi --list
 
 `tapd-sync` coordinates TAPD tracking across a work session:
 
-- Reuses an installed TAPD skill, authenticated CLI, or environment configuration
+- Activates for every substantive work session, even when the user does not mention TAPD
+- Adapts by runtime capability to an installed TAPD skill, authenticated CLI, or environment configuration
 - Ranks up to three matching open work items at session start
 - Binds the session only after user confirmation
-- Creates valuable follow-up work as child requirements without repeated approval
+- Creates valuable follow-up work without repeated TAPD business confirmation while respecting host runtime permissions
 - Completes the child requirements covered by successful code commits
+- Keeps one TAPD write owner across primary, forked, and compacted contexts
 - Keeps the original task moving when TAPD is unavailable
 
 ## License
