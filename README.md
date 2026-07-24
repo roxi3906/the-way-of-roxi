@@ -4,10 +4,11 @@
 
 ## Quick Install
 
-Install the current published skill directly from GitHub:
+Install a published skill directly from GitHub:
 
 ```bash
 npx skills add roxi3906/the-way-of-roxi --skill roxis-way
+npx skills add roxi3906/the-way-of-roxi --skill tapd-sync
 ```
 
 List all skills in this repository:
@@ -27,9 +28,10 @@ skills/<skill-name>/
   assets/
 ```
 
-It currently ships one skill:
+It currently ships two skills:
 
 - `skills/roxis-way/`: Reusable collaboration, implementation, testing, language, and delivery rules for any user.
+- `skills/tapd-sync/`: Session-aware TAPD work-item matching, binding, child-requirement creation, and commit-driven completion.
 
 ## Repository Layout
 
@@ -38,7 +40,11 @@ It currently ships one skill:
 ├── LICENSE
 ├── README.md
 └── skills
-    └── roxis-way
+    ├── roxis-way
+    │   ├── SKILL.md
+    │   └── agents
+    │       └── openai.yaml
+    └── tapd-sync
         ├── SKILL.md
         └── agents
             └── openai.yaml
@@ -50,15 +56,16 @@ Install from GitHub with the `skills` CLI:
 
 ```bash
 npx skills add roxi3906/the-way-of-roxi --skill roxis-way
+npx skills add roxi3906/the-way-of-roxi --skill tapd-sync
 ```
 
-If this repository grows to include more skills, install a specific one with `--skill <skill-name>` or inspect available skills with:
+Install any specific skill with `--skill <skill-name>` or inspect all available skills with:
 
 ```bash
 npx skills add roxi3906/the-way-of-roxi --list
 ```
 
-## Included Skill
+## Included Skills
 
 `roxis-way` defines defaults for:
 
@@ -71,6 +78,15 @@ npx skills add roxi3906/the-way-of-roxi --list
 - Comment language
 - Third-party package installation preference
 - Delivery verification expectations
+
+`tapd-sync` coordinates TAPD tracking across a work session:
+
+- Reuses an installed TAPD skill, authenticated CLI, or environment configuration
+- Ranks up to three matching open work items at session start
+- Binds the session only after user confirmation
+- Creates valuable follow-up work as child requirements without repeated approval
+- Completes the child requirements covered by successful code commits
+- Keeps the original task moving when TAPD is unavailable
 
 ## License
 
