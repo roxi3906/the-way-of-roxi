@@ -72,10 +72,11 @@ npx skills add roxi3906/the-way-of-roxi --list
 `roxis-way` defines defaults for:
 
 - Collaboration language
+- Context-aware language selection for each output destination
 - Planning artifact placement
 - Git conventions and PR authorization
 - Post-merge PR cleanup approval and scope limits
-- Product language defaults
+- Product language selection
 - Frontend coding style
 - Comment language
 - Third-party package installation preference
