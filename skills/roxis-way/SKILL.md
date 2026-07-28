@@ -1,6 +1,6 @@
 ---
 name: roxis-way
-description: Use when working in a repository for a user or when a task must follow the user's rules for reply language, worktree authorization, private plan storage, Git workflow conventions, pull request authorization, branch naming, pull request target selection, pull request title or body drafting, post-merge cleanup approval, product language defaults, code comment triggers, code comment language, third-party integration choices, or delivery validation.
+description: Use whenever working in a repository for a user, including before creating or editing any reply or project artifact and whenever deciding language for code comments, pull request titles or bodies, plans, specs, architecture documents, development proposals, data-analysis results, UI copy, or developer-facing output. Enforces language selection from each output destination, workspace authorization, private plan storage, Git and PR workflow, cleanup approval, frontend and comment style, third-party integration choices, and delivery validation.
 ---
 
 # Roxi's Way
@@ -10,14 +10,39 @@ Follow these rules for all work done for the user.
 ## Hard Rules
 
 - When this skill applies, use Simplified Chinese for replies to the user.
+- Inspect every output destination before writing or revising it, then apply Output Language Selection; make this decision for each output independently, even when one task produces multiple artifacts.
+- Never use the current conversation language as the primary language evidence for a non-conversational output.
 - When work may create a plan, modify the repository, or require completion validation, ask the user to choose the workspace and validation strategy with numbered quick-reply lists before starting task execution.
 - Before asking the user to choose the workspace strategy, check whether local branches or git worktree branches already match the task and present any matches as ranked options.
 - Only create pull requests after the user gives an explicit instruction for that exact action.
 - Before cleanup after a pull request has been merged, prepare a cleanup plan that lists the PR development contents involved and the exact cleanup script or commands, then submit them to the user for review before execution.
 - During post-merge PR cleanup, only touch items and run commands that were included in the user's reviewed cleanup plan.
 - Only move in-progress plans into tracked shared docs when the user explicitly asks for a shared or long-term document.
-- When product-facing language is unspecified, default only user-facing product text to English.
+- For product-facing text, use the destination's established language and only fall back to English when no applicable local evidence exists.
 - Before reporting completion, run the selected e2e or closest substitute validation; if the user selected "Other" for validation without details, choose the coverage scope based on risk and state that choice.
+
+## Output Language Selection
+
+Trigger: Apply before creating or revising any reply, code comment, pull request title or body, plan, checklist, spec, architecture document, development proposal, data-analysis result, UI copy, developer-facing message, or other artifact.
+
+- Do not write or revise the output until its language has been selected.
+- For each output or independently governed part of an output, choose the language in this order and stop at the first decisive source:
+  1. Follow the user's explicit language instruction for that specific output.
+  2. Follow binding rules or templates that govern the output destination, such as repository instructions, contribution guides, document templates, or platform requirements.
+  3. Use the dominant language of the same content type at the exact output destination.
+  4. If local evidence is insufficient, expand outward to the nearest relevant scope and inspect the same content type there.
+  5. If no clear precedent exists, use the fallback for that output type.
+- Prefer evidence that is closer to the destination, more similar in content type, and more recent. Do not let a broad repository pattern override a clear pattern at the actual destination.
+- Decide the language for each output independently. Files produced by the same task may use different languages when their destinations differ.
+- Evaluate independently governed parts separately. In particular, evaluate a PR title and body separately because a repository may use different language conventions for each.
+- When evidence is sparse or mixed, inspect additional nearby examples before using a fallback; do not call a language dominant without a clear pattern.
+- The current conversation language may govern direct replies under Collaboration, but it is not primary evidence for repository artifacts or other non-conversational outputs.
+- Use these artifact-specific contexts and fallbacks:
+  - For code comments, inspect the target file first, then nearby comments and similar files; if no pattern is clear, use Simplified Chinese.
+  - For plans, specs, architecture documents, development proposals, and data-analysis results, inspect same-type documents in the target directory first, then the nearest related documentation scope; if no pattern is clear, use Simplified Chinese.
+  - For pull requests, inspect recent comparable PRs in the target repository and assess the PR title and body separately; if no pattern is clear, use an English conventional-commit title and a Simplified Chinese body.
+  - For product-facing text, inspect project language rules and nearby product copy; if no pattern is clear, use English.
+  - For other project artifacts, inspect same-type outputs at the destination, then the project's dominant developer-facing language; if no pattern is clear, use Simplified Chinese.
 
 ## Collaboration
 
@@ -53,7 +78,7 @@ Trigger: Apply this section when creating or moving any in-progress plan, checkl
 - Name each in-progress plan file with the current date and a concise summary of the planned changes, such as `YYYY-MM-DD-update-payment-retry-plan.md`.
 - When an in-progress plan changes materially, rename the file so its date and summary still match the latest revision and planned changes.
 - Keep those in-progress planning artifacts out of git. Only update `.gitignore` when needed to keep them untracked.
-- Unless the project explicitly requires another language or the user explicitly asks for one, write development plans, task breakdowns, specs, and other planning documents in Chinese.
+- Select the language of every development plan, task breakdown, spec, or other planning document through Output Language Selection. Inspect same-type artifacts in the target private directory first, then the nearest project planning or documentation scope; use Simplified Chinese only when no clear precedent exists.
 - Only move a plan into tracked `docs/`, `specs/`, or another shared location when the user explicitly asks for a shared, reviewable, or long-term document.
 
 ## Git And PR Conventions
@@ -69,20 +94,21 @@ Trigger: Apply this section when committing, naming branches, force-adding ignor
 - Before creating the pull request, prepare the viable merge target branches and submit the recommended target together with the alternatives to the user for explicit selection and authorization.
 - Only fall back to this target branch priority when the source branch cannot be determined reliably or does not exist: `dev/main`, `devlope`, `master`, `main`.
 - Verify that the user's selected target branch exists before using it.
-- When drafting a pull request title, write it in English and use a standard conventional commit style, such as `feat: add admin login` or `fix: resolve payment timeout`.
-- When drafting a pull request body, write it in Chinese unless the user explicitly requests another language.
-- Structure the pull request body with standard sections for `总结`, `要点`, `影响范围`, `测试结果`, and `潜在问题`.
+- Before drafting pull request content, inspect recent comparable pull requests in the target repository and select the language for the PR title and body separately through Output Language Selection.
+- Preserve any repository-required pull request title format. When no clear local language precedent exists, use an English conventional commit title such as `feat: add admin login` or `fix: resolve payment timeout`.
+- When no clear local language precedent exists for the pull request body, use Simplified Chinese.
+- Structure the pull request body with standard sections equivalent to Summary, Highlights, Impact, Test Results, and Potential Issues. Write the headings in the selected body language and match established repository wording when available.
 - In the summary section, describe the change as functional outcomes or business-facing behavior rather than a plain code-file or implementation checklist.
-- Use the `要点` section only for concise product-facing changes introduced by the PR. Each bullet must describe changed user or product behavior, entry points, naming, URLs, discoverability, compatibility, business capability, data behavior, integrations, or operationally relevant outcomes.
-- Do not include unchanged existing functionality, tests, builds, lint, validation, file moves, component names, internal refactors, config edits, or implementation mechanics in `要点`; place those in `测试结果`, `影响范围`, or `潜在问题` when relevant.
-- For merge or release pull requests, write `要点` bullets about the product changes being released, not merge mechanics, source branches, target branches, commit plumbing, or repository synchronization.
-- If a technical change has no direct product-facing effect, omit it from `要点` unless it affects compatibility, discoverability, user access, data behavior, integrations, or operations.
-- Avoid `要点` bullets that merely say a page or flow continues to support existing content or behavior. Preserve unchanged scope in `影响范围` when needed.
-- Include an `影响范围` section that explains affected user flows, business paths, modules, data or state flows, integrations, and operational concerns when applicable.
-- If related pull requests exist, include them in a separate `关联 PR` section with each pull request's title or purpose and link.
+- Use the highlights section only for concise product-facing changes introduced by the PR. Each bullet must describe changed user or product behavior, entry points, naming, URLs, discoverability, compatibility, business capability, data behavior, integrations, or operationally relevant outcomes.
+- Do not include unchanged existing functionality, tests, builds, lint, validation, file moves, component names, internal refactors, config edits, or implementation mechanics in the highlights section; place those in test results, impact, or potential issues when relevant.
+- For merge or release pull requests, write highlight bullets about the product changes being released, not merge mechanics, source branches, target branches, commit plumbing, or repository synchronization.
+- If a technical change has no direct product-facing effect, omit it from the highlights section unless it affects compatibility, discoverability, user access, data behavior, integrations, or operations.
+- Avoid highlight bullets that merely say a page or flow continues to support existing content or behavior. Preserve unchanged scope in the impact section when needed.
+- Include an impact section that explains affected user flows, business paths, modules, data or state flows, integrations, and operational concerns when applicable.
+- If related pull requests exist, include them in a separate related pull requests section, written in the selected body language, with each pull request's title or purpose and link.
 - Automatically identify and mention relevant authors from commits, PR metadata, or changed work when that information is available.
 - Associate relevant assignees with the pull request when assignee information is available.
-- Include a separate `作者` section at the bottom of the pull request body.
+- Include a separate authors section at the bottom of the pull request body, with its heading written in the selected body language.
 
 ## Post-Merge Cleanup Constraints
 
@@ -95,13 +121,13 @@ Trigger: Apply this section when cleaning up after a pull request has been merge
 - If cleanup reveals new items or requires different commands, stop and submit an updated cleanup plan and script for the user's review before continuing.
 - After cleanup, report which planned items were completed and any approved items left unchanged.
 
-## Product Language Defaults
+## Product Language
 
-Trigger: Apply this section when writing UI copy or any user-facing product message and the project language is not already defined.
+Trigger: Apply this section when writing UI copy or any user-facing product message.
 
-- When the project documentation does not define the language for UI copy or other user-facing product messages, default those messages to English.
-- Apply that default only to end-user-visible text, including visible UI copy, form validation messages, toast messages, dialog text, API response messages exposed to users, and similar prompts.
-- Do not apply this default to internal-only tooling, developer-facing output, logs, comments, or planning artifacts unless the task explicitly makes them user-facing.
+- Select the language through Output Language Selection. Inspect project language rules and nearby product copy before writing; use English only when no clear local precedent exists.
+- Apply this section only to end-user-visible text, including visible UI copy, form validation messages, toast messages, dialog text, API response messages exposed to users, and similar prompts.
+- Do not apply this section to internal-only tooling, developer-facing output, logs, comments, or planning artifacts unless the task explicitly makes them user-facing.
 
 ## Frontend Code Style
 
@@ -121,9 +147,9 @@ Trigger: Apply this section when writing, editing, adding, or substantially rewr
 - Only comment untouched existing code when the user explicitly asks for comment-only cleanup or the untouched code must be explained to make your new code understandable.
 - When the logic is simple, keep the comment brief and focused on block responsibility or UI section purpose rather than line-by-line narration.
 - When the logic involves tricky behavior, feature rules, implementation constraints, or important tradeoffs, add a more detailed comment that explains the non-obvious part.
-- When the file's dominant existing comment language is clear, match that language.
-- When the file has mixed or sparse comments, follow the nearest surrounding comment style when possible.
-- Only default to Chinese when the file's existing comment language still cannot be determined.
+- Select comment language through Output Language Selection. Match the target file's dominant existing comment language when it is clear.
+- When the target file has mixed or sparse comments, inspect the nearest surrounding comments and then similar nearby files.
+- Use Simplified Chinese only when no clear comment-language precedent exists after that inspection.
 - Do not add comments that only restate the code.
 
 ## Third-Party Packages And Component Libraries
