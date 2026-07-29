@@ -22,6 +22,15 @@ Connect the current work context to TAPD capabilities already configured in the 
 - Do not request a second TAPD business confirmation before automatically creating child requirements or completing bound child requirements. Always honor the host runtime's permission controls for tools, commands, network access, and writes.
 - Send the bind-or-create reminder only once, after completing the first request.
 
+## Use User-Readable TAPD References
+
+- In every user-facing response, refer to TAPD entities by a user-readable title or display name rather than an internal ID. Use work-item titles for requirements, defects, tasks, parents, and children; use display names for workspaces, projects, users, statuses, and work-item types.
+- Keep IDs in session state, API calls, adapter inputs, idempotency keys, verification, and link destinations. Never render an ID as plain user-facing text or as a link label.
+- When the user supplies an ID or selects a candidate by number, resolve the current entity and respond with its title or display name without echoing the ID. A user-readable title or display name may be a link whose destination contains the ID.
+- Distinguish duplicate names with user-readable context such as workspace display name, project name, work-item type, parent title, or status. Never append an ID for disambiguation.
+- If no user-readable value can be resolved, state that the TAPD entity's name is temporarily unavailable and include only a non-sensitive reason. Do not fall back to its ID. If the missing name prevents a reliable user choice, pause that TAPD operation while continuing unrelated user work.
+- Treat every instruction elsewhere in this skill to store, compare, fetch, return, or verify an ID as internal processing unless it explicitly defines user-facing output. Apply this section to candidate lists, reminders, binding confirmations, write summaries, parent-child descriptions, partial-write reports, and errors.
+
 ## Maintain Session State
 
 Maintain the following state in the current session context:
@@ -104,10 +113,10 @@ Treat these signals as progressively weaker evidence:
 
 Mark an item as a perfect match only when it represents the same actual delivery goal. Treat insufficient evidence conservatively as a non-perfect match.
 
-Show up to three candidates in this format, including the resolved project name, type, ID, title, match level, and a short reason:
+Show up to three candidates in this format, including the resolved project name, type, title, match level, and a short reason. When an item URL is available, use its title as the link label:
 
 ```text
-1. [Project] [Type #ID] Title - Perfect match/Related/Weak match - Reason
+1. [Project] [Type] Title - Perfect match/Related/Weak match - Reason
 ```
 
 Do not label a workspace display name as the project when project-name resolution is ambiguous or missing. Show the workspace separately from the project-name evidence in that case. Do not pad the list with unreliable candidates when fewer than three exist. Initial matching is read-only and does not require TAPD business confirmation, but it must still honor host runtime permissions for tools and network access. Continue the user's original task without waiting for a binding.
@@ -130,6 +139,8 @@ When the user confirms a binding by candidate number, ID, or explicit work item:
 2. Resolve `tapd_project_name` and compare it with any leading project prefix on the item. Treat normalized-equivalent spellings as the same project and keep the stable historical spelling. If non-equivalent evidence conflicts, ask the user to choose the project name before binding.
 3. Accept any work-item type currently supported by the workspace as the parent.
 4. Save `tapd_binding` with `tapd_project_name.value` only after project-name resolution succeeds. Do not create a child requirement for the binding message itself.
+
+Confirm the binding with the parent's type and title, linked when a URL is available. Do not echo an ID supplied by the user.
 
 When the user confirms creation with the proposed title:
 
@@ -212,11 +223,11 @@ Keep child requirements in their current state when no code commit occurs. If wo
 
 After any TAPD write, include these details concisely in the original task summary:
 
-- Created or reused work-item ID and title.
-- Parent work-item ID.
-- Current status.
-- Work items completed because of a code commit.
-- Any create, owner verification, bind, or transition failure and its non-sensitive reason.
+- Created or reused work-item title, linked when a URL is available.
+- Parent work-item title, linked when a URL is available.
+- Current status display name.
+- Titles of work items completed because of a code commit.
+- Any create, owner verification, bind, or transition failure and its non-sensitive reason, referring to affected entities only by user-readable titles or display names.
 
 Do not add an empty TAPD section when TAPD is configured and no write occurred.
 
