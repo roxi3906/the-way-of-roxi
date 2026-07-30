@@ -1,0 +1,6 @@
+interface:
+  display_name: "TAPD Summary"
+  short_description: "Summarize TAPD work by project on explicit request"
+  default_prompt: "Use $tapd-summary to summarize today's TAPD work and tomorrow's plan by project."
+policy:
+  allow_implicit_invocation: false
