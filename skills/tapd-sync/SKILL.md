@@ -1,6 +1,6 @@
 ---
 name: tapd-sync
-description: Proactively synchronizes every substantive work session with TAPD work, even when the user does not mention TAPD. It activates for coding, implementation, fixes, debugging, refactoring, review, research, design, decision analysis, documentation, testing, releases, operations, repository maintenance, or other deliverables; explicit TAPD or work-item requests about requirements, defects, tasks, binding, or sync; contextual confirmations that bind a candidate or approve a proposed top-level item; and follow-up changes, questions, validation, or commits. It excludes casual conversation, unrelated acknowledgements, simple status checks, simple translations, time queries, and requests without an independent outcome. Mixed requests activate when they include substantive work. After binding, it maintains valuable child requirements and completes only children covered by successful Git commits. It selects an installed TAPD skill, authenticated CLI, or configured HTTP access by runtime capability.
+description: Proactively synchronizes substantive work sessions with TAPD even when the user does not mention TAPD. Use for implementation, fixes, debugging, refactoring, review, research, design, decisions, documentation, testing, releases, operations, repository maintenance, other deliverables, explicit TAPD work-item requests, binding or creation confirmations, and valuable follow-up work. Exclude requests that explicitly invoke or select `tapd-summary`, casual conversation, acknowledgements, simple status or time queries, translations, and requests without an independent outcome. Mixed substantive requests activate unless they explicitly invoke or select `tapd-summary`. After binding, maintain valuable child requirements and complete only children covered by successful Git commits. Select an installed TAPD skill, authenticated CLI, or configured HTTP access by runtime capability.
 ---
 
 # TAPD Sync
@@ -10,6 +10,7 @@ Connect the current work context to TAPD capabilities already configured in the 
 ## Establish the Work Context
 
 - Treat `session`, `conversation`, `task`, and `thread` as the current continuous work context, regardless of the host runtime's terminology.
+- When the current request explicitly invokes or selects `tapd-summary`, do not initialize, match, remind, bind, create, reuse, complete, or otherwise process TAPD through this skill. Yield the entire request to `tapd-summary`, even when this session already has a binding.
 - Initialize as soon as the first substantive request provides enough repository, topic, or deliverable context for reliable matching. If it does not, wait until that context becomes available.
 - Do not depend on a product-specific invocation prefix. Explicit invocation is optional and uses whatever syntax the host runtime supports.
 - If the runtime loads this skill again in the same work context, reuse the existing state rather than initializing again.
