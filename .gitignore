@@ -2,3 +2,4 @@
 **/.codex
 .claude/
 .ai/
+node_modules/

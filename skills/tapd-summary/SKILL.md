@@ -1,6 +1,6 @@
 ---
 name: tapd-summary
-description: Manual-only, read-only TAPD daily work summary and next-day plan workflow with complete pagination, current-user filtering, terminal-state verification, and project grouping. Use only when the user explicitly invokes `$tapd-summary`, selects this skill by name, or explicitly says to use `tapd-summary`. Never invoke it implicitly for ordinary TAPD, task-summary, daily-report, planning, coding, or work-session requests.
+description: Generate a read-only TAPD daily work summary and next-day plan only when the user explicitly invokes or selects `tapd-summary`. Trigger for `$tapd-summary`, `/tapd-summary` where the host supports it, a host skill selection, or a direct instruction to use the tapd-summary skill. Verify all configured workspaces, pagination, current-user scope, terminal transitions, and project grouping. Never invoke automatically for ordinary TAPD, task summary, daily report, today's tasks, tomorrow's plan, 日报, 今日任务, 明日计划, coding, or work-session requests.
 ---
 
 # TAPD Summary

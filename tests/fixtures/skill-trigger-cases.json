@@ -1,0 +1,128 @@
+{
+  "targetAgents": [
+    "codex",
+    "claude-code",
+    "cursor",
+    "gemini-cli",
+    "github-copilot",
+    "opencode"
+  ],
+  "skills": {
+    "roxis-way": {
+      "invocationPolicy": "implicit",
+      "frontloadCharacters": 360,
+      "frontloadedSignalGroups": [
+        ["repository", "repo", "codebase", "software project"],
+        ["codebase", "repo task"],
+        ["coding", "implementation", "fix", "review", "research", "design", "testing", "documentation"]
+      ],
+      "negativeDescriptionSignalGroups": [
+        ["do not use"],
+        ["casual conversation"],
+        ["translations"],
+        ["time queries"],
+        ["unrelated", "repository"]
+      ],
+      "positivePrompts": [
+        "Implement the requested repository change and verify it.",
+        "Review this codebase for regressions before release."
+      ],
+      "paraphrasePrompts": [
+        "请在这个仓库里修复问题并完成验证。",
+        "Update the project documentation to match the current implementation."
+      ],
+      "negativePrompts": [
+        "Translate this one sentence into Chinese.",
+        "What time is it in Singapore?"
+      ],
+      "explicitInvocations": {
+        "codex": "$roxis-way",
+        "claude-code": "/roxis-way",
+        "cursor": "/roxis-way",
+        "gemini-cli": "Use the roxis-way skill for this request.",
+        "github-copilot": "/roxis-way",
+        "opencode": "/roxis-way"
+      },
+      "mayCoactivateWith": ["tapd-sync"]
+    },
+    "tapd-sync": {
+      "invocationPolicy": "implicit",
+      "frontloadCharacters": 420,
+      "frontloadedSignalGroups": [
+        ["tapd"],
+        ["automatically", "automatic"],
+        ["work item", "requirement", "defect", "task", "需求", "缺陷", "任务", "工作项"]
+      ],
+      "negativeDescriptionSignalGroups": [
+        ["do not use"],
+        ["tapd-summary"],
+        ["casual chat"],
+        ["acknowledgements"],
+        ["time queries"],
+        ["translations"],
+        ["without an independent outcome"]
+      ],
+      "positivePrompts": [
+        "Implement this repository feature and keep the work tracked.",
+        "Fix the defect linked to this TAPD work item."
+      ],
+      "paraphrasePrompts": [
+        "完成这次代码审查，并同步相关需求。",
+        "Research this design decision as an independently verifiable deliverable."
+      ],
+      "negativePrompts": [
+        "Thanks, that answers my question.",
+        "Use tapd-summary to summarize today's work."
+      ],
+      "explicitInvocations": {
+        "codex": "$tapd-sync",
+        "claude-code": "/tapd-sync",
+        "cursor": "/tapd-sync",
+        "gemini-cli": "Use the tapd-sync skill for this request.",
+        "github-copilot": "/tapd-sync",
+        "opencode": "/tapd-sync"
+      },
+      "mayCoactivateWith": ["roxis-way"]
+    },
+    "tapd-summary": {
+      "invocationPolicy": "explicit-only",
+      "frontloadCharacters": 360,
+      "frontloadedSignalGroups": [
+        ["tapd"],
+        ["explicit", "explicitly", "manual-only"],
+        ["$tapd-summary"],
+        ["/tapd-summary", "use the tapd-summary skill"]
+      ],
+      "negativeDescriptionSignalGroups": [
+        ["only when", "explicitly"],
+        ["never invoke automatically"],
+        ["ordinary tapd"],
+        ["daily report"],
+        ["日报"],
+        ["今日任务"],
+        ["明日计划"]
+      ],
+      "positivePrompts": [
+        "$tapd-summary Summarize today's TAPD work and tomorrow's plan.",
+        "Use the tapd-summary skill to produce yesterday's work summary."
+      ],
+      "paraphrasePrompts": [
+        "/tapd-summary 只输出今天的工作汇总。",
+        "I selected tapd-summary; build a read-only daily report."
+      ],
+      "negativePrompts": [
+        "Summarize today's tasks.",
+        "What should I work on tomorrow?"
+      ],
+      "explicitInvocations": {
+        "codex": "$tapd-summary",
+        "claude-code": "/tapd-summary",
+        "cursor": "/tapd-summary",
+        "gemini-cli": "Use the tapd-summary skill for this request.",
+        "github-copilot": "/tapd-summary",
+        "opencode": "/tapd-summary"
+      },
+      "mayCoactivateWith": []
+    }
+  }
+}

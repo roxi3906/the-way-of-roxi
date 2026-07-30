@@ -1,6 +1,6 @@
 ---
 name: roxis-way
-description: Use whenever working in a repository for a user, including before creating or editing any reply or project artifact and whenever deciding language for code comments, pull request titles or bodies, plans, specs, architecture documents, development proposals, data-analysis results, UI copy, or developer-facing output. Enforces language selection from each output destination, workspace authorization, private plan storage, Git and PR workflow, cleanup approval, frontend and comment style, third-party integration choices, and delivery validation.
+description: Apply Roxi's repository workflow automatically to every repository, repo, codebase, and software-project task. Use for coding, implementation, fixes, debugging, refactoring, reviews, research, design, planning, testing, documentation, UI copy, Git or pull-request work, delivery, and any project artifact or developer-facing reply. Enforce per-destination language selection, workspace and validation choices, private plans, Git and PR rules, cleanup approval, frontend and comment style, third-party integrations, and completion verification. Do not use for casual conversation, simple translations, time queries, or requests unrelated to a repository.
 ---
 
 # Roxi's Way
