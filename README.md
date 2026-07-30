@@ -4,12 +4,10 @@
 
 ## Quick Install
 
-Install a published skill directly from GitHub:
+Install every skill for the six primary supported agents:
 
 ```bash
-npx skills add roxi3906/the-way-of-roxi --skill roxis-way
-npx skills add roxi3906/the-way-of-roxi --skill tapd-sync
-npx skills add roxi3906/the-way-of-roxi --skill tapd-summary
+npx skills add roxi3906/the-way-of-roxi --skill '*' --agent codex claude-code cursor gemini-cli github-copilot opencode -y
 ```
 
 List all skills in this repository:
@@ -29,7 +27,7 @@ skills/<skill-name>/
   assets/
 ```
 
-The TAPD skills follow the open Agent Skills specification. The `skills` CLI maps the same canonical skills into the discovery location supported by the selected compatible agent, so this repository does not maintain vendor-specific copies.
+All skills follow the open Agent Skills specification. The `skills` CLI maps the same canonical skills into the discovery location supported by the selected compatible agent, so this repository does not maintain vendor-specific copies.
 
 It currently ships three skills:
 
@@ -37,12 +35,34 @@ It currently ships three skills:
 - `skills/tapd-sync/`: Session-aware TAPD work-item matching, binding, child-requirement creation, and commit-driven completion.
 - `skills/tapd-summary/`: Explicitly invoked, read-only daily work and next-day plan summaries grouped by project.
 
+## Agent Compatibility
+
+The locked `skills` CLI is exercised against a fresh temporary installation for every target below. Installation verifies that each registered skill is byte-for-byte identical to its canonical source.
+
+| Agent | Project discovery root | Invocation behavior |
+| --- | --- | --- |
+| Codex | `.agents/skills` | `roxis-way` and `tapd-sync` may activate implicitly; use `$skill-name` to select explicitly |
+| Claude Code | `.claude/skills` | May activate from the description; use `/skill-name` to select explicitly |
+| Cursor | `.agents/skills` | May activate from the description; use `/skill-name` or name the skill explicitly |
+| Gemini CLI | `.agents/skills` | Discovers relevant skills and may request activation confirmation; name the skill explicitly when needed |
+| GitHub Copilot | `.agents/skills` | Loads relevant skills from the shared discovery root; use `/skill-name` or name it explicitly |
+| OpenCode | `.agents/skills` | Loads relevant skills from the shared discovery root; use the OpenCode v2 `/skill-name` form or name it explicitly |
+
+Automatic selection is a model decision, so successful installation cannot guarantee implicit activation for every prompt. The descriptions intentionally front-load common English and Chinese trigger phrases. For deterministic use, explicitly say `Use the roxis-way skill ...`, `Use the tapd-sync skill ...`, or invoke the agent-specific command shown above. `tapd-summary` is deliberately explicit-only so ordinary requests for summaries or reports do not trigger TAPD access.
+
 ## Repository Layout
 
 ```text
 .
 ├── LICENSE
+├── package.json
 ├── README.md
+├── scripts
+│   ├── lib
+│   │   └── run-process.mjs
+│   ├── verify-agent-installations.mjs
+│   ├── verify-codex-triggers.mjs
+│   └── verify.mjs
 └── skills
     ├── roxis-way
     │   ├── SKILL.md
@@ -60,15 +80,13 @@ It currently ships three skills:
 
 ## Install
 
-Install from GitHub with the `skills` CLI:
+Install one skill for selected agents:
 
 ```bash
-npx skills add roxi3906/the-way-of-roxi --skill roxis-way
-npx skills add roxi3906/the-way-of-roxi --skill tapd-sync
-npx skills add roxi3906/the-way-of-roxi --skill tapd-summary
+npx skills add roxi3906/the-way-of-roxi --skill roxis-way --agent codex claude-code cursor gemini-cli github-copilot opencode -y
 ```
 
-Install any specific skill with `--skill <skill-name>` or inspect all available skills with:
+Replace `roxis-way` with `tapd-sync` or `tapd-summary` as needed. Inspect all available skills with:
 
 ```bash
 npx skills add roxi3906/the-way-of-roxi --list
@@ -108,6 +126,17 @@ npx skills add roxi3906/the-way-of-roxi --list
 - Combines current-user creation and verified completion events without title-based deduplication
 - Produces a live next-day plan from target-day work that remains unfinished
 - Returns compact unordered lists grouped by project with title-only work items
+
+## Maintainer Verification
+
+Use Node.js 22.20.0 or newer, install the locked development dependencies, then run the full verification entrypoint:
+
+```bash
+npm install
+npm run verify
+```
+
+`npm test` validates structured metadata, trigger contracts, negative boundaries, OpenAI policy, and real temporary installations for all six agents. `npm run verify:codex` additionally launches fresh, ephemeral, read-only Codex sessions for both implicit skills and the explicit-only summary skill. The online smoke copies only the current `CODEX_HOME` authentication into an isolated temporary home, exposes no host credentials or TAPD adapter to model tools, rejects all tool activity, and fails clearly when Codex is not authenticated.
 
 ## License
 
