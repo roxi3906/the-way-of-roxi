@@ -122,12 +122,21 @@ Show up to three candidates in this format, including the resolved project name,
 
 Do not label a workspace display name as the project when project-name resolution is ambiguous or missing. Show the workspace separately from the project-name evidence in that case. Do not pad the list with unreliable candidates when fewer than three exist. Initial matching is read-only and does not require TAPD business confirmation, but it must still honor host runtime permissions for tools and network access. Continue the user's original task without waiting for a binding.
 
+## Prefer Work-Item Types by Purpose
+
+Before proposing or creating a work item, query the current workspace's supported types and default type. Compare each type's stable key or code when the adapter exposes one and its display name case-insensitively. Use only the selected type ID from the current workspace; never hardcode or reuse a type ID from another workspace.
+
+- For a top-level parent, prefer an exact `STORY` or `需求` type, then a type whose key, code, or display name unambiguously contains `story` or `需求`, then the workspace's default type.
+- For an automatic child, prefer an exact `TASK` or `任务` type, then an exact `开发任务` or `技术任务` type, then a type whose key, code, or display name unambiguously contains `task` or `任务`, then the workspace's default type.
+
+Do not let the absence of a preferred semantic type block creation when the workspace has a default type.
+
 ## Remind Once After the First Request
 
 Complete the user's first request, then append one concise reminder based on the matching result and set `tapd_reminder_sent` to true:
 
 - When a perfect match exists, recommend the candidates in rank order and ask the user to bind one. Never choose for the user automatically.
-- When no perfect match exists and `tapd_project_name` is resolved, use the most relevant workspace and propose `【{tapd_project_name.value}】{work_description}`, then state that the top-level work item can be created and bound automatically.
+- When no perfect match exists and `tapd_project_name` is resolved, use the most relevant workspace, resolve its preferred top-level parent type, and propose that type's display name with `【{tapd_project_name.value}】{work_description}`, then state that the top-level work item can be created and bound automatically.
 - When `tapd_project_name` is ambiguous or missing, present its evidence and ask the user to resolve the project name before proposing creation. Never substitute the workspace display name.
 - When multiple workspaces are equally reasonable, ask the user to choose a workspace before creation. Never guess.
 - If the user declines, ignores, or does not complete the binding, do not remind again in this session and do not create child requirements automatically.
@@ -147,7 +156,7 @@ When the user confirms creation with the proposed title:
 
 1. Resolve the workspace. If multiple workspaces remain equally reasonable, ask the user to choose first.
 2. Require `tapd_project_name.status` to be `resolved`. If it is ambiguous or missing, ask the user to resolve it and do not create the item. Never use the workspace display name instead.
-3. Resolve the workspace's work-item type named `TASK` or `任务`, case-insensitively. Use the workspace's default type when no such type exists.
+3. Resolve the workspace's preferred top-level parent type using the purpose-based type rules. Query the types again if the earlier proposal is stale.
 4. Use `【{tapd_project_name.value}】{work_description}` as the title.
 5. Require a resolved `tapd_owner`. If it is unresolved, skip creation, report the non-sensitive reason, and continue the user's original task.
 6. Check `tapd_partial_writes` for the top-level logical idempotency key before issuing a create. If a recorded item now passes verification, reuse it and continue at step 9 without creating another item.
@@ -191,7 +200,7 @@ For a valuable request, perform these steps before starting the user's requested
 6. Before issuing a new create, query every page and status for the logical idempotency key and record all matching item IDs. Do not reuse a closed match for a new request.
 7. Prefer the selected TAPD skill or CLI's generic create-child-requirement operation. Require it to create a requirement in TAPD's unified work-item model, use the item in `tapd_binding` as the parent regardless of its displayed type, and verify the returned parent relationship. Never substitute a legacy task creation operation.
 8. When falling back to HTTP, follow the current official TAPD API and unified work-item model, create the child through `/stories`, and set `parent_id`. Never claim success if the API does not support the current parent relationship.
-9. Dynamically resolve the `workitem_type_id` named `TASK` or `任务`. Use the workspace's default work-item type when it is absent. Never hardcode a type ID from another workspace.
+9. Dynamically resolve the preferred automatic-child `workitem_type_id` using the purpose-based type rules.
 10. Require a resolved `tapd_owner`. If it is unresolved, skip creation, report the non-sensitive reason, and continue the user's original task. Otherwise set the owner to `tapd_owner.value`, the start date to the runtime's current date, and the due date to one calendar day later.
 11. For a newly created child, verify both its returned parent relationship and its returned or fetched owner before treating synchronization as successful.
 12. Add the created or reused item and its corresponding user request to `tapd_session_children`, then continue the user's requested work.
