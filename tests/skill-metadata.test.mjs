@@ -85,6 +85,25 @@ test("every canonical skill has valid portable metadata and a complete trigger c
   }
 });
 
+test("every canonical skill keeps invocation portable across host agents", async () => {
+  const names = await discoverSkillNames();
+  const contracts = await readContracts();
+  const missingSignals = [];
+
+  for (const name of names) {
+    const skillPath = path.join(skillsRoot, name, "SKILL.md");
+    const contents = (await readFile(skillPath, "utf8")).toLowerCase();
+
+    for (const signals of contracts.portableRuntimeSignalGroups) {
+      if (!signals.some((signal) => contents.includes(signal.toLowerCase()))) {
+        missingSignals.push(`${name}: ${signals.join(" | ")}`);
+      }
+    }
+  }
+
+  assert.deepEqual(missingSignals, []);
+});
+
 test("the locked skills CLI discovers every canonical skill", async () => {
   const names = await discoverSkillNames();
   const { stdout } = await execFileAsync(skillsCli, ["add", root, "--list"], {

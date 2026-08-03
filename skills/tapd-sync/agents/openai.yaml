@@ -1,6 +1,6 @@
 interface:
   display_name: "TAPD Sync"
-  short_description: "Sync every substantive work session with TAPD"
-  default_prompt: "Use $tapd-sync to match this work session with TAPD and maintain valuable follow-up work."
+  short_description: "Prompt once, then track after parent binding"
+  default_prompt: "Use $tapd-sync to match the first response, prompt once for a parent, pause when unbound, and maintain child work items after binding."
 policy:
   allow_implicit_invocation: true

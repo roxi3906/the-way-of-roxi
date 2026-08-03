@@ -55,7 +55,7 @@ const verifyInstalledSkill = async (agent, skillName, installedRoot) => {
   }
 };
 
-const verifyAgent = async (agent, skillNames, signal) => {
+const verifyAgent = async (agent, installRoot, skillNames, signal) => {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), "the-way-of-roxi-agent-install-"));
 
   try {
@@ -69,8 +69,8 @@ const verifyAgent = async (agent, skillNames, signal) => {
       maxBuffer: 16 * 1024 * 1024,
     });
 
-    const isClaude = agent === "claude-code";
-    const installedRoot = path.join(tempRoot, isClaude ? ".claude" : ".agents", "skills");
+    // 每个 Agent 独立安装，验证 CLI 实际使用的原生项目目录。
+    const installedRoot = path.join(tempRoot, installRoot);
     for (const skillName of skillNames) {
       await verifyInstalledSkill(agent, skillName, installedRoot);
     }
@@ -78,8 +78,7 @@ const verifyAgent = async (agent, skillNames, signal) => {
     return {
       agent,
       skills: skillNames,
-      canonicalRoot: isClaude ? null : ".agents/skills",
-      nativeRoot: isClaude ? ".claude/skills" : null,
+      installRoot,
     };
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
@@ -88,11 +87,13 @@ const verifyAgent = async (agent, skillNames, signal) => {
 
 export const verifyAgentInstallations = async () => {
   const skillNames = await discoverSkillNames();
-  const { targetAgents } = JSON.parse(await readFile(contractPath, "utf8"));
+  const { agentInstallRoots, targetAgents } = JSON.parse(await readFile(contractPath, "utf8"));
   const controller = new AbortController();
   try {
     return await Promise.all(
-      targetAgents.map((agent) => verifyAgent(agent, skillNames, controller.signal)),
+      targetAgents.map((agent) =>
+        verifyAgent(agent, agentInstallRoots[agent], skillNames, controller.signal),
+      ),
     );
   } catch (error) {
     controller.abort();
@@ -100,13 +101,49 @@ export const verifyAgentInstallations = async () => {
   }
 };
 
+export const verifyCombinedAgentInstallation = async () => {
+  const skillNames = await discoverSkillNames();
+  const { agentInstallRoots, targetAgents } = JSON.parse(await readFile(contractPath, "utf8"));
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "the-way-of-roxi-agent-install-"));
+
+  try {
+    await runProcessWithClosedStdin({
+      file: skillsCli,
+      args: ["add", root, "--skill", "*", "--agent", ...targetAgents, "--copy", "-y"],
+      cwd: tempRoot,
+      env: { ...process.env, CI: "1", NO_COLOR: "1" },
+      timeoutMs: 120_000,
+      maxBuffer: 16 * 1024 * 1024,
+    });
+
+    // `--copy` 保留多目标安装的原生目录；共享目录只需验证一次。
+    const installRoots = [...new Set(targetAgents.map((agent) => agentInstallRoots[agent]))];
+    for (const installRoot of installRoots) {
+      for (const skillName of skillNames) {
+        await verifyInstalledSkill("combined", skillName, path.join(tempRoot, installRoot));
+      }
+    }
+
+    return { agents: targetAgents, installRoots, skills: skillNames };
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+};
+
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === scriptPath;
 
 if (isMain) {
   try {
-    const reports = await verifyAgentInstallations();
+    const combined = process.argv.includes("--verify-combined");
+    const reports = combined
+      ? await verifyCombinedAgentInstallation()
+      : await verifyAgentInstallations();
     if (process.argv.includes("--json")) {
       process.stdout.write(`${JSON.stringify(reports)}\n`);
+    } else if (combined) {
+      process.stdout.write(
+        `${reports.agents.length} agents: ${reports.skills.length} skills verified across ${reports.installRoots.length} catalogs\n`,
+      );
     } else {
       for (const report of reports) {
         process.stdout.write(`${report.agent}: ${report.skills.length} skills verified\n`);

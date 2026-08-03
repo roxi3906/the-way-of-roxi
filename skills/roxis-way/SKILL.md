@@ -1,11 +1,17 @@
 ---
 name: roxis-way
-description: Apply Roxi's repository workflow automatically to every repository, repo, codebase, and software-project task. Use for coding, implementation, fixes, debugging, refactoring, reviews, research, design, planning, testing, documentation, UI copy, Git or pull-request work, delivery, and any project artifact or developer-facing reply. Enforce per-destination language selection, workspace and validation choices, private plans, Git and PR rules, cleanup approval, frontend and comment style, third-party integrations, and completion verification. Do not use for casual conversation, simple translations, time queries, or requests unrelated to a repository.
+description: Apply Roxi's repository workflow automatically across supported host agents to every repository, repo, codebase, and software-project task. Use for coding, implementation, fixes, debugging, refactoring, reviews, research, design, planning, testing, documentation, UI copy, Git or pull-request work, delivery, and any project artifact or developer-facing reply. Enforce per-destination language selection, workspace and validation choices, private plans, Git and PR rules, cleanup approval, frontend and comment style, third-party integrations, and completion verification. Do not use for casual conversation, simple translations, time queries, or requests unrelated to a repository.
 ---
 
 # Roxi's Way
 
 Follow these rules for all work done for the user.
+
+## Apply Across Agent Runtimes
+
+- Apply the same workflow in every supported host runtime and use the host's actual tools, permissions, and task terminology.
+- Do not depend on a product-specific invocation prefix. Allow implicit activation from the skill description, and accept the explicit skill syntax supported by the current host agent when the user selects this skill directly.
+- Keep host-specific commands and installation paths out of this workflow; use the repository compatibility contract for those mappings.
 
 ## Hard Rules
 

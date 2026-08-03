@@ -1,0 +1,110 @@
+#!/bin/sh
+
+set -eu
+
+argument_value() {
+  argument_name=$1
+  shift
+  while [ "$#" -gt 0 ]; do
+    if [ "$1" = "$argument_name" ] && [ "$#" -gt 1 ]; then
+      printf '%s' "$2"
+      return 0
+    fi
+    shift
+  done
+  return 1
+}
+
+today=2026-08-03
+command_name=${1:---help}
+
+case "$command_name" in
+  --help|-h|help)
+    printf '%s\n' '{"fixture_operation":"help"}'
+    cat <<'EOF'
+fake-tapd-cli: authenticated read-only TAPD fixture
+
+Every command prints JSON. Available commands:
+  tapd-cli status
+  tapd-cli identity
+  tapd-cli workspaces
+  tapd-cli work-item-types --workspace-id ID
+  tapd-cli workflows --workspace-id ID
+  tapd-cli work-items list --workspace-id ID --model stories|bugs|tasks --page N --page-size N
+  tapd-cli work-items get --workspace-id ID --id ID
+  tapd-cli work-items history --workspace-id ID --id ID
+
+The workspaces response is exhaustive when complete is true. List responses are
+fully paginated when has_more is false. This fixture has no write commands.
+EOF
+    ;;
+  status)
+    printf '%s\n' '{"fixture_operation":"status","authenticated":true,"read_only":true,"configured_workspaces_complete":true}'
+    ;;
+  identity)
+    printf '%s\n' '{"fixture_operation":"identity","id":"user-1","nick":"roxi","creator":"roxi","active":true}'
+    ;;
+  workspaces)
+    printf '%s\n' '{"fixture_operation":"workspaces","items":[{"id":"workspace-1","name":"Engineering"}],"complete":true}'
+    ;;
+  work-item-types)
+    requested_workspace=$(argument_value --workspace-id "$@" || true)
+    if [ "$requested_workspace" != "workspace-1" ]; then
+      printf '%s\n' '{"fixture_operation":"work-item-types-invalid","error":"workspace_not_found"}' >&2
+      exit 3
+    fi
+    printf '%s\n' '{"fixture_operation":"work-item-types","items":[{"id":"story","code":"STORY","name":"Requirement","default":true},{"id":"task","code":"TASK","name":"Task","default":false}]}'
+    ;;
+  workflows)
+    requested_workspace=$(argument_value --workspace-id "$@" || true)
+    if [ "$requested_workspace" != "workspace-1" ]; then
+      printf '%s\n' '{"fixture_operation":"workflows-invalid","error":"workspace_not_found"}' >&2
+      exit 3
+    fi
+    printf '%s\n' '{"fixture_operation":"workflows","statuses":[{"id":"open","name":"Open","terminal":false},{"id":"done","name":"Done","terminal":true,"successful":true}],"transitions":[{"from":"open","to":"done"}]}'
+    ;;
+  work-items)
+    action=${2:-}
+    case "$action" in
+      list)
+        requested_workspace=$(argument_value --workspace-id "$@" || true)
+        if [ "$requested_workspace" != "workspace-1" ]; then
+          printf '%s\n' '{"fixture_operation":"work-items-list-invalid","error":"workspace_not_found"}' >&2
+          exit 3
+        fi
+        model=$(argument_value --model "$@" || true)
+        if [ "$model" = "stories" ]; then
+          printf '{"fixture_operation":"work-items-list-stories","items":[{"id":"parent-1","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Improve README agent documentation","description":"Document the supported agent installation flow for this repository.","status":"Open","status_id":"open","owner":"roxi;","creator":"roxi","created":"%sT09:00:00+08:00","modified":"%sT09:30:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent"}],"page":1,"has_more":false}\n' "$today" "$today"
+        else
+          printf '{"fixture_operation":"work-items-list-%s","items":[],"page":1,"has_more":false}\n' "$model"
+        fi
+        ;;
+      get)
+        requested_workspace=$(argument_value --workspace-id "$@" || true)
+        requested_id=$(argument_value --id "$@" || true)
+        if [ "$requested_workspace" != "workspace-1" ] || [ "$requested_id" != "parent-1" ]; then
+          printf '%s\n' '{"fixture_operation":"work-items-get-invalid","error":"not_found"}' >&2
+          exit 3
+        fi
+        printf '{"fixture_operation":"work-items-get-parent-1","id":"parent-1","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Improve README agent documentation","description":"Document the supported agent installation flow for this repository.","status":"Open","status_id":"open","owner":"roxi;","creator":"roxi","created":"%sT09:00:00+08:00","modified":"%sT09:30:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent"}\n' "$today" "$today"
+        ;;
+      history)
+        requested_workspace=$(argument_value --workspace-id "$@" || true)
+        requested_id=$(argument_value --id "$@" || true)
+        if [ "$requested_workspace" != "workspace-1" ] || [ "$requested_id" != "parent-1" ]; then
+          printf '%s\n' '{"fixture_operation":"work-items-history-invalid","error":"not_found"}' >&2
+          exit 3
+        fi
+        printf '%s\n' '{"fixture_operation":"work-items-history-parent-1","items":[],"complete":true}'
+        ;;
+      *)
+        printf '%s\n' '{"error":"unknown read action"}' >&2
+        exit 2
+        ;;
+    esac
+    ;;
+  *)
+    printf '%s\n' '{"error":"unknown or write-like command","read_only":true}' >&2
+    exit 2
+    ;;
+esac
