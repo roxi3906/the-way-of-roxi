@@ -1,6 +1,6 @@
 ---
 name: tapd-summary
-description: Generate a read-only TAPD daily work summary and next-day plan only when the user explicitly invokes or selects `tapd-summary`. Trigger for `$tapd-summary`, `/tapd-summary` where the host supports it, a host skill selection, or a direct instruction to use the tapd-summary skill. Verify all configured workspaces, pagination, current-user scope, terminal transitions, and project grouping. Never invoke automatically for ordinary TAPD, task summary, daily report, today's tasks, tomorrow's plan, 日报, 今日任务, 明日计划, coding, or work-session requests.
+description: Generate a read-only TAPD daily work summary and next-day plan only when the user explicitly invokes or selects `tapd-summary`. Trigger for `$tapd-summary`, `/tapd-summary`, `/skills tapd-summary` where the host supports them, a host skill selection, or a direct instruction to use the tapd-summary skill. Verify all configured workspaces, pagination, current-user scope, terminal transitions, and project grouping. Never invoke automatically for ordinary TAPD, task summary, daily report, today's tasks, tomorrow's plan, 日报, 今日任务, 明日计划, coding, or work-session requests.
 ---
 
 # TAPD Summary
@@ -11,9 +11,11 @@ Produce a verified TAPD summary without changing TAPD. Treat every rule in this 
 
 Before accessing TAPD, confirm that the current user request explicitly invokes this skill by one of these mechanisms:
 
-- The request contains `$tapd-summary`.
+- The request uses the host runtime's explicit skill syntax for `tapd-summary`, such as `$tapd-summary`, `/tapd-summary`, or `/skills tapd-summary` where supported.
 - The host reports that the user selected the `tapd-summary` skill.
 - The user explicitly says to use `tapd-summary` for the request.
+
+Do not depend on a product-specific invocation prefix. Accept only the current host agent's documented explicit selection signal; never treat an ordinary summary request as an invocation.
 
 If none applies, stop this skill immediately. Do not discover adapters, query TAPD, or produce a TAPD summary. Never infer invocation from words such as "TAPD", "summary", "daily report", "today's tasks", or "tomorrow's plan".
 

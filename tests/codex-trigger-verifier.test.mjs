@@ -63,8 +63,8 @@ test("Codex trigger runs remove TAPD configuration while preserving required run
   }
 });
 
-test("Codex trigger runs are ephemeral, isolated, and read-only", async () => {
-  const { buildCodexArgs } = await loadVerifier();
+test("Codex trigger runs are isolated and can persist only for lifecycle verification", async () => {
+  const { buildCodexArgs, buildCodexResumeArgs } = await loadVerifier();
   const result = buildCodexArgs({
     workdir: "/tmp/fresh-repo",
     outputPath: "/tmp/fresh-repo/final.txt",
@@ -94,10 +94,46 @@ test("Codex trigger runs are ephemeral, isolated, and read-only", async () => {
     "--json",
     "Review this repository.",
   ]);
+
+  const persistent = buildCodexArgs({
+    workdir: "/tmp/fresh-repo",
+    outputPath: "/tmp/fresh-repo/first.txt",
+    prompt: "Start the lifecycle check.",
+    toolHome: "/tmp/fresh-repo/home",
+    toolPath: "/tmp/fake-bin:/usr/bin:/bin",
+    ephemeral: false,
+  });
+  assert.ok(!persistent.includes("--ephemeral"));
+
+  assert.deepEqual(
+    buildCodexResumeArgs({
+      threadId: "019fc5b7-286f-73c2-b9cf-d0401e5a465e",
+      outputPath: "/tmp/fresh-repo/second.txt",
+      prompt: "Continue the lifecycle check.",
+      toolHome: "/tmp/fresh-repo/home",
+      toolPath: "/tmp/fake-bin:/usr/bin:/bin",
+    }),
+    [
+      "exec",
+      "resume",
+      "--ignore-user-config",
+      "--ignore-rules",
+      "--config",
+      'shell_environment_policy.inherit="none"',
+      "--config",
+      'shell_environment_policy.set={PATH="/tmp/fake-bin:/usr/bin:/bin",HOME="/tmp/fresh-repo/home",CI="1",NO_COLOR="1"}',
+      "--skip-git-repo-check",
+      "--output-last-message",
+      "/tmp/fresh-repo/second.txt",
+      "--json",
+      "019fc5b7-286f-73c2-b9cf-d0401e5a465e",
+      "Continue the lifecycle check.",
+    ],
+  );
 });
 
 test("Codex trigger evidence distinguishes repository workflow, TAPD sync, and explicit summary behavior", async () => {
-  const { assertTriggerBehavior } = await loadVerifier();
+  const { assertSummaryNotTriggered, assertTriggerBehavior } = await loadVerifier();
 
   assert.doesNotThrow(() =>
     assertTriggerBehavior(
@@ -136,9 +172,17 @@ test("Codex trigger evidence distinguishes repository workflow, TAPD sync, and e
   assert.doesNotThrow(() =>
     assertTriggerBehavior(
       "tapd-sync",
-      "SKILL_ACTIVATED: eval-tapd-sync\nTAPD is not configured on this device, so sync is disabled.\nREADME improvement: document the six-agent installation command.",
+      "SKILL_ACTIVATED: eval-tapd-sync\nREADME improvement: document the thirteen-agent installation command.\n\nTAPD is not configured on this device, so sync is disabled.",
       "eval-tapd-sync",
     ),
+  );
+  assert.throws(() =>
+    assertTriggerBehavior(
+      "tapd-sync",
+      "SKILL_ACTIVATED: eval-tapd-sync\nTAPD is not configured on this device, so sync is disabled.\nREADME improvement: document the thirteen-agent installation command.",
+      "eval-tapd-sync",
+    ),
+    /final TAPD status at the end/,
   );
   assert.throws(() =>
     assertTriggerBehavior(
@@ -146,6 +190,119 @@ test("Codex trigger evidence distinguishes repository workflow, TAPD sync, and e
       "TAPD is not configured on this device, so sync is disabled.",
       "eval-tapd-sync",
     ),
+  );
+
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "tapd-sync-first-match",
+      [
+        "SKILL_ACTIVATED: eval-tapd-sync-lifecycle",
+        "README improvement: clarify the agent installation command.",
+        "TAPD: [【Trigger Evaluation Repository】Improve README agent documentation](https://tapd.example.invalid/workitems/parent) - Recommended parent",
+      ].join("\n"),
+      "eval-tapd-sync-lifecycle",
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "tapd-sync-first-match",
+        "SKILL_ACTIVATED: eval-tapd-sync-lifecycle\nREADME improvement without a linked candidate.",
+        "eval-tapd-sync-lifecycle",
+      ),
+    /first read-only match/,
+  );
+
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "tapd-sync-bound",
+      [
+        "SKILL_ACTIVATED: eval-tapd-sync-bound",
+        "README improvement: document the thirteen-agent installation command.",
+        "",
+        "TAPD: [Improve skill delivery](https://tapd.example.invalid/workitems/parent) | [Review installation docs](https://tapd.example.invalid/workitems/child)",
+      ].join("\n"),
+      "eval-tapd-sync-bound",
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "tapd-sync-bound",
+        "SKILL_ACTIVATED: eval-tapd-sync-bound\nREADME improvement.\n\nTAPD: Improve skill delivery",
+        "eval-tapd-sync-bound",
+      ),
+    /linked TAPD work items at the end/,
+  );
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "tapd-sync-selected-candidate",
+      "SKILL_ACTIVATED: eval-tapd-sync-lifecycle\nBound.\nTAPD: [【Trigger Evaluation Repository】Improve README agent documentation](https://tapd.example.invalid/workitems/parent)",
+      "eval-tapd-sync-lifecycle",
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "tapd-sync-selected-candidate",
+        "SKILL_ACTIVATED: eval-tapd-sync-lifecycle\nTAPD: [cached item](https://tapd.example.invalid/workitems/parent)",
+        "eval-tapd-sync-lifecycle",
+      ),
+    /selected candidate/,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "tapd-sync-bound",
+        "SKILL_ACTIVATED: eval-tapd-sync-bound\nTAPD: [Improve skill delivery](https://tapd.example.invalid/workitems/parent)\nREADME improvement.",
+        "eval-tapd-sync-bound",
+      ),
+    /linked TAPD work items at the end/,
+  );
+
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "tapd-sync-dormant",
+      [
+        "SKILL_ACTIVATED: eval-tapd-sync-dormant",
+        "README improvement: document the thirteen-agent installation command.",
+      ].join("\n"),
+      "eval-tapd-sync-dormant",
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "tapd-sync-dormant",
+        [
+          "SKILL_ACTIVATED: eval-tapd-sync-dormant",
+          "README improvement: document the thirteen-agent installation command.",
+          "TAPD is not configured on this device, so sync is disabled.",
+        ].join("\n"),
+        "eval-tapd-sync-dormant",
+      ),
+    /dormant TAPD sync emitted TAPD output/,
+  );
+
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "tapd-sync-reactivated",
+      [
+        "SKILL_ACTIVATED: eval-tapd-sync-reactivated",
+        "I cannot create the requested parent work item in this environment.",
+        "TAPD is not configured on this device, so sync is disabled.",
+      ].join("\n"),
+      "eval-tapd-sync-reactivated",
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "tapd-sync-reactivated",
+        "SKILL_ACTIVATED: eval-tapd-sync-reactivated\nNo TAPD action was attempted.",
+        "eval-tapd-sync-reactivated",
+      ),
+    /explicit parent request did not reactivate TAPD sync/,
   );
   assert.throws(() =>
     assertTriggerBehavior(
@@ -168,6 +325,35 @@ test("Codex trigger evidence distinguishes repository workflow, TAPD sync, and e
       "A complete TAPD summary is unavailable.",
       "tapd-summary",
     ),
+  );
+
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "tapd-summary-capable",
+      "SKILL_ACTIVATED: eval-tapd-summary-capable\nToday\n【Trigger Evaluation Repository】Improve README agent documentation",
+      "eval-tapd-summary-capable",
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "tapd-summary-capable",
+        "SKILL_ACTIVATED: eval-tapd-summary-capable\nA complete TAPD summary is unavailable.",
+        "eval-tapd-summary-capable",
+      ),
+    /capable read-only adapter/,
+  );
+
+  assert.doesNotThrow(() =>
+    assertSummaryNotTriggered("Today's local documentation task is to clarify installation.", "eval-tapd-summary-negative"),
+  );
+  assert.throws(
+    () =>
+      assertSummaryNotTriggered(
+        "SKILL_ACTIVATED: eval-tapd-summary-negative\nTAPD summary",
+        "eval-tapd-summary-negative",
+      ),
+    /unexpectedly activated/,
   );
 });
 
@@ -221,6 +407,21 @@ test("Codex trigger output falls back to the final agent message in the JSON eve
   }
 });
 
+test("Codex lifecycle verification resolves the persisted thread id", async () => {
+  const { resolveThreadId } = await loadVerifier();
+
+  assert.equal(
+    resolveThreadId(
+      [
+        JSON.stringify({ type: "thread.started", thread_id: "test-thread" }),
+        JSON.stringify({ type: "turn.started" }),
+      ].join("\n"),
+    ),
+    "test-thread",
+  );
+  assert.throws(() => resolveThreadId(JSON.stringify({ type: "turn.started" })), /thread.started/);
+});
+
 test("Codex trigger verification rejects tool activity and sandbox denial events", async () => {
   const { assertNoToolActivity } = await loadVerifier();
   const messageOnly = [
@@ -248,12 +449,134 @@ test("Codex trigger verification rejects tool activity and sandbox denial events
   );
 });
 
+test("Codex capable-adapter verification permits only read-only TAPD CLI activity", async () => {
+  const { assertReadOnlyTapdActivity } = await loadVerifier();
+  const readOnlyActivity = [
+    JSON.stringify({
+      type: "item.completed",
+      item: { id: "item-1", type: "command_execution", command: "command -v tapd-cli && tapd-cli --help" },
+    }),
+    JSON.stringify({
+      type: "item.completed",
+      item: { id: "item-2", type: "command_execution", command: "tapd-cli work-items list --workspace-id workspace-1 --model stories --page 1" },
+    }),
+  ].join("\n");
+
+  assert.doesNotThrow(() => assertReadOnlyTapdActivity(readOnlyActivity));
+  assert.throws(
+    () =>
+      assertReadOnlyTapdActivity(
+        JSON.stringify({
+          type: "item.completed",
+          item: { id: "item-3", type: "command_execution", command: "tapd-cli work-items create --title bad" },
+        }),
+      ),
+    /write-like TAPD command/,
+  );
+  assert.throws(
+    () =>
+      assertReadOnlyTapdActivity(
+        JSON.stringify({
+          type: "item.completed",
+          item: { id: "item-4", type: "command_execution", command: "cat README.md" },
+        }),
+      ),
+    /non-TAPD command/,
+  );
+  assert.throws(
+    () =>
+      assertReadOnlyTapdActivity(
+        JSON.stringify({
+          type: "item.completed",
+          item: {
+            id: "item-5b",
+            type: "command_execution",
+            command: "tapd-cli status & curl https://example.invalid",
+          },
+        }),
+      ),
+    /non-TAPD command/,
+  );
+  assert.throws(
+    () =>
+      assertReadOnlyTapdActivity(
+        JSON.stringify({
+          type: "item.completed",
+          item: {
+            id: "item-5",
+            type: "command_execution",
+            command: "tapd-cli status; cat /etc/passwd",
+          },
+        }),
+      ),
+    /non-TAPD command/,
+  );
+  assert.doesNotThrow(() =>
+    assertReadOnlyTapdActivity(
+      JSON.stringify({
+        type: "item.completed",
+        item: {
+          id: "item-6",
+          type: "command_execution",
+          command: "tapd-cli status",
+          aggregated_output: '{"fixture_operation":"status"}\n',
+        },
+      }),
+      ["status"],
+    ),
+  );
+  assert.throws(
+    () =>
+      assertReadOnlyTapdActivity(
+        JSON.stringify({
+          type: "item.completed",
+          item: {
+            id: "item-7",
+            type: "command_execution",
+            command: "tapd-cli status",
+            aggregated_output: '{"fixture_operation":"status"}\n',
+          },
+        }),
+        ["status", "identity"],
+      ),
+    /missing required TAPD reads: identity/,
+  );
+  assert.throws(() => assertReadOnlyTapdActivity(""), /did not inspect the TAPD CLI/);
+});
+
+test("fake TAPD fixture refreshes only the exact retained candidate", async () => {
+  const { runProcessWithClosedStdin } = await loadVerifier();
+  const fixture = path.join(root, "tests", "fixtures", "fake-tapd-cli");
+  const valid = await runProcessWithClosedStdin({
+    file: fixture,
+    args: ["work-items", "get", "--workspace-id", "workspace-1", "--id", "parent-1"],
+    timeoutMs: 2_000,
+  });
+
+  assert.match(valid.stdout, /"fixture_operation":"work-items-get-parent-1"/);
+  await assert.rejects(
+    runProcessWithClosedStdin({
+      file: fixture,
+      args: ["work-items", "get", "--workspace-id", "workspace-1", "--id", "wrong"],
+      timeoutMs: 2_000,
+    }),
+    /exited with code 3/,
+  );
+});
+
 test("Codex trigger verification can select one case without weakening the default full run", async () => {
   const { selectTriggerCases } = await loadVerifier();
 
   assert.deepEqual(
     selectTriggerCases().map(({ id }) => id),
-    ["roxis-way", "tapd-sync", "tapd-summary"],
+    [
+      "roxis-way",
+      "tapd-sync",
+      "tapd-sync-lifecycle",
+      "tapd-summary-negative",
+      "tapd-summary",
+      "tapd-summary-capable",
+    ],
   );
   assert.deepEqual(
     selectTriggerCases("tapd-sync").map(({ id }) => id),
@@ -261,6 +584,10 @@ test("Codex trigger verification can select one case without weakening the defau
   );
   assert.equal(selectTriggerCases("tapd-summary")[0].evalName, "eval-tapd-summary");
   assert.match(selectTriggerCases("tapd-summary")[0].prompt, /^\$eval-tapd-summary\b/);
+  assert.equal(selectTriggerCases("tapd-sync-lifecycle")[0].turns.length, 3);
+  assert.equal(selectTriggerCases("tapd-sync-lifecycle")[0].useFakeTapd, true);
+  assert.equal(selectTriggerCases("tapd-summary-capable")[0].useFakeTapd, true);
+  assert.doesNotMatch(selectTriggerCases("tapd-summary-negative")[0].prompt, /TAPD/i);
   assert.throws(() => selectTriggerCases("missing-skill"), /Unknown Codex trigger case/);
 });
 

@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { access, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +10,17 @@ export { runProcessWithClosedStdin } from "./lib/run-process.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const root = path.resolve(path.dirname(scriptPath), "..");
+const tapdInitializationReads = [
+  "help",
+  "status",
+  "identity",
+  "workspaces",
+  "work-item-types",
+  "workflows",
+  "work-items-list-stories",
+  "work-items-list-bugs",
+  "work-items-list-tasks",
+];
 
 const triggerCases = [
   {
@@ -20,12 +31,56 @@ const triggerCases = [
   {
     id: "tapd-sync",
     evalName: "eval-tapd-sync",
-    prompt: "Without running tools, network requests, or file reads, handle a substantive README review in an isolated environment with no TAPD adapter. Continue the task by reporting one concrete improvement to the six-agent installation documentation.",
+    prompt: "Without running tools, network requests, or file reads, handle a substantive README review in an isolated environment with no TAPD adapter. Continue the task by reporting one concrete improvement to the thirteen-agent installation documentation.",
+  },
+  {
+    id: "tapd-sync-lifecycle",
+    sourceSkillId: "tapd-sync",
+    evalName: "eval-tapd-sync-lifecycle",
+    useFakeTapd: true,
+    turns: [
+      {
+        behavior: "tapd-sync-first-match",
+        toolPolicy: "tapd-read-only",
+        requiredTapdReads: tapdInitializationReads,
+        prompt: "Without reading or editing files, review the README agent-installation documentation and report one concrete improvement. An authenticated read-only TAPD CLI named tapd-cli is available in PATH. This request does not ask to bind or create a parent work item.",
+      },
+      {
+        behavior: "tapd-sync-dormant",
+        toolPolicy: "none",
+        prompt: "Without running tools or mentioning TAPD, add one more sentence about README clarity. This request does not ask to bind or create anything.",
+      },
+      {
+        behavior: "tapd-sync-selected-candidate",
+        toolPolicy: "tapd-read-only",
+        requiredTapdReads: ["work-items-get-parent-1"],
+        prompt: "1",
+      },
+    ],
+  },
+  {
+    id: "tapd-summary-negative",
+    sourceSkillId: "tapd-summary",
+    evalName: "eval-tapd-summary-negative",
+    prompt: "Without running tools, summarize today's local documentation tasks in one sentence.",
   },
   {
     id: "tapd-summary",
     evalName: "eval-tapd-summary",
     prompt: "$eval-tapd-summary Without running tools or network requests, summarize today's TAPD work and tomorrow's plan in an isolated environment with no TAPD adapter.",
+  },
+  {
+    id: "tapd-summary-capable",
+    sourceSkillId: "tapd-summary",
+    evalName: "eval-tapd-summary-capable",
+    useFakeTapd: true,
+    toolPolicy: "tapd-read-only",
+    requiredTapdReads: [
+      ...tapdInitializationReads,
+      "work-items-get-parent-1",
+      "work-items-history-parent-1",
+    ],
+    prompt: "$eval-tapd-summary-capable Use the authenticated read-only tapd-cli available in PATH to summarize TAPD work from 2026-08-03 and the next-day plan. Do not read or edit repository files.",
   },
 ];
 
@@ -89,15 +144,26 @@ export const createIsolatedCodexHome = async ({ sourceCodexHome, destination }) 
   await cp(sourceAuth, path.join(destination, "auth.json"));
 };
 
-export const buildCodexArgs = ({ workdir, outputPath, prompt, toolHome, toolPath }) => [
-  "exec",
-  "--ephemeral",
-  "--ignore-user-config",
-  "--ignore-rules",
+const shellEnvironmentArgs = ({ toolHome, toolPath }) => [
   "--config",
   'shell_environment_policy.inherit="none"',
   "--config",
   `shell_environment_policy.set={PATH=${JSON.stringify(toolPath)},HOME=${JSON.stringify(toolHome)},CI="1",NO_COLOR="1"}`,
+];
+
+export const buildCodexArgs = ({
+  workdir,
+  outputPath,
+  prompt,
+  toolHome,
+  toolPath,
+  ephemeral = true,
+}) => [
+  "exec",
+  ...(ephemeral ? ["--ephemeral"] : []),
+  "--ignore-user-config",
+  "--ignore-rules",
+  ...shellEnvironmentArgs({ toolHome, toolPath }),
   "--sandbox",
   "read-only",
   "--cd",
@@ -108,6 +174,20 @@ export const buildCodexArgs = ({ workdir, outputPath, prompt, toolHome, toolPath
   "--output-last-message",
   outputPath,
   "--json",
+  prompt,
+];
+
+export const buildCodexResumeArgs = ({ threadId, outputPath, prompt, toolHome, toolPath }) => [
+  "exec",
+  "resume",
+  "--ignore-user-config",
+  "--ignore-rules",
+  ...shellEnvironmentArgs({ toolHome, toolPath }),
+  "--skip-git-repo-check",
+  "--output-last-message",
+  outputPath,
+  "--json",
+  threadId,
   prompt,
 ];
 
@@ -131,12 +211,74 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
   }
 
   if (caseId === "tapd-sync") {
+    const unavailableMessage = "TAPD is not configured on this device, so sync is disabled.";
     if (
-      !output.includes("TAPD is not configured on this device, so sync is disabled.") ||
+      !output.includes(unavailableMessage) ||
       !/README/i.test(output) ||
       !/(install|installation|agent|安装|兼容|改进|维护)/i.test(output)
     ) {
       throw new Error("tapd-sync did not report unavailability and continue the README review");
+    }
+    if (!output.trimEnd().endsWith(unavailableMessage)) {
+      throw new Error("tapd-sync did not place the final TAPD status at the end");
+    }
+    return;
+  }
+
+  if (caseId === "tapd-sync-first-match") {
+    const finalLine = output.trimEnd().split(/\r?\n/).at(-1) || "";
+    if (
+      !/README/i.test(output) ||
+      !/^>?\s*TAPD:\s/.test(finalLine) ||
+      !/\[【Trigger Evaluation Repository】Improve README agent documentation\]\(https:\/\/tapd\.example\.invalid\/workitems\/parent\)/.test(finalLine)
+    ) {
+      throw new Error("tapd-sync did not perform the first read-only match and link its candidate");
+    }
+    return;
+  }
+
+  if (caseId === "tapd-sync-dormant") {
+    const activationLine = `SKILL_ACTIVATED: ${activationMarker}`;
+    const substantiveOutput = output
+      .split(/\r?\n/)
+      .filter((line) => line.trim() !== activationLine)
+      .join("\n");
+    if (!/README/i.test(substantiveOutput)) {
+      throw new Error("dormant TAPD sync did not continue the original request");
+    }
+    if (/TAPD|https?:\/\/[^\s)]*workitems/i.test(substantiveOutput)) {
+      throw new Error("dormant TAPD sync emitted TAPD output");
+    }
+    return;
+  }
+
+  if (caseId === "tapd-sync-reactivated") {
+    const unavailableMessage = "TAPD is not configured on this device, so sync is disabled.";
+    if (!output.trimEnd().endsWith(unavailableMessage)) {
+      throw new Error("explicit parent request did not reactivate TAPD sync");
+    }
+    return;
+  }
+
+  if (caseId === "tapd-sync-bound") {
+    const finalLine = output.trimEnd().split(/\r?\n/).at(-1) || "";
+    const linkedItems = finalLine.match(/\[[^\]]+\]\(https?:\/\/[^)]+\)/g) || [];
+    if (
+      !/^>?\s*TAPD:\s/.test(finalLine) ||
+      linkedItems.length < 1
+    ) {
+      throw new Error("tapd-sync did not place linked TAPD work items at the end");
+    }
+    return;
+  }
+
+  if (caseId === "tapd-sync-selected-candidate") {
+    const finalLine = output.trimEnd().split(/\r?\n/).at(-1) || "";
+    if (
+      !/^>?\s*TAPD:\s/.test(finalLine) ||
+      !/\[【Trigger Evaluation Repository】Improve README agent documentation\]\(https:\/\/tapd\.example\.invalid\/workitems\/parent\)/.test(finalLine)
+    ) {
+      throw new Error("tapd-sync did not verify and link the selected candidate");
     }
     return;
   }
@@ -148,7 +290,23 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     return;
   }
 
+  if (caseId === "tapd-summary-capable") {
+    if (
+      !/【Trigger Evaluation Repository】Improve README agent documentation/.test(output) ||
+      /(unavailable|not configured|不可用|无法)/i.test(output)
+    ) {
+      throw new Error("tapd-summary did not use the capable read-only adapter data");
+    }
+    return;
+  }
+
   throw new Error(`Unknown Codex trigger case: ${caseId}`);
+};
+
+export const assertSummaryNotTriggered = (output, activationMarker) => {
+  if (output.includes(`SKILL_ACTIVATED: ${activationMarker}`) || /\bTAPD\b/i.test(output)) {
+    throw new Error("ordinary task summary unexpectedly activated tapd-summary");
+  }
 };
 
 export const createEvalSkill = async ({ sourceSkill, skillsRoot, evalName }) => {
@@ -167,6 +325,7 @@ export const createEvalSkill = async ({ sourceSkill, skillsRoot, evalName }) => 
     "## Activation Verification",
     "",
     `Include the exact line \`SKILL_ACTIVATED: ${evalName}\` in the final response.`,
+    "Place this activation line before any final TAPD footer required by this skill.",
     "",
   ].join("\n");
   const body = skillContents.slice(match[0].length).replace(/^\r?\n?/, "");
@@ -241,6 +400,37 @@ export const resolveCodexOutput = async ({ outputPath, stdout }) => {
   throw new Error("Codex produced neither a final-message file nor an agent-message JSON event");
 };
 
+const parseCodexEvents = (stdout) =>
+  String(stdout || "")
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .flatMap((line) => {
+      try {
+        return [JSON.parse(line)];
+      } catch {
+        return [];
+      }
+    });
+
+export const resolveThreadId = (stdout) => {
+  const started = parseCodexEvents(stdout).find(
+    (event) => event?.type === "thread.started" && event?.thread_id,
+  );
+  if (!started) throw new Error("Codex output did not include a thread.started event");
+  return started.thread_id;
+};
+
+const assertNoSandboxFailure = (event) => {
+  if (
+    event?.type === "error" &&
+    /(sandbox|approval).*(denied|reject|fail)|(?:denied|reject|fail).*(sandbox|approval)/i.test(
+      event.message || "",
+    )
+  ) {
+    throw new Error("Codex encountered a sandbox or approval failure");
+  }
+};
+
 export const assertNoToolActivity = (stdout) => {
   const prohibitedItemTypes = new Set([
     "command_execution",
@@ -251,21 +441,88 @@ export const assertNoToolActivity = (stdout) => {
     "image_generation",
   ]);
 
-  for (const line of String(stdout || "").split(/\r?\n/).filter(Boolean)) {
-    let event;
-    try {
-      event = JSON.parse(line);
-    } catch {
-      continue;
-    }
-
+  for (const event of parseCodexEvents(stdout)) {
     if (prohibitedItemTypes.has(event?.item?.type)) {
       throw new Error(`Codex used prohibited tool activity: ${event.item.type}`);
     }
-    if (event?.type === "error" && /(sandbox|approval).*(denied|reject|fail)|(?:denied|reject|fail).*(sandbox|approval)/i.test(event.message || "")) {
-      throw new Error("Codex encountered a sandbox or approval failure");
+    assertNoSandboxFailure(event);
+  }
+};
+
+const assertTapdOnlyCommand = (command) => {
+  if (/`|\$\(|[<>]/.test(command)) {
+    throw new Error(`Codex used a non-TAPD shell construct during adapter verification: ${command}`);
+  }
+
+  const segments = command.split(/\s*(?:&&|\|\||[;&|\n])\s*/).filter(Boolean);
+  for (const rawSegment of segments) {
+    const segment = rawSegment
+      .trim()
+      .replace(/^\/?bin\/(?:ba|z)?sh\s+-lc\s+['"]?/, "")
+      .replace(/^['"]|['"]$/g, "")
+      .trim();
+    if (/^(?:command\s+-v|which|type(?:\s+-a)?)\s+tapd-cli$/.test(segment)) continue;
+
+    const invocation = segment.match(
+      /^(?:['"]?(?:[^\s'"]*\/)?tapd-cli['"]?)(?:\s+(.+))?$/,
+    );
+    if (!invocation) {
+      throw new Error(`Codex used a non-TAPD command during adapter verification: ${segment}`);
+    }
+
+    const args = String(invocation[1] || "").replace(/['"]$/, "").trim();
+    if (
+      /^(?:--help|-h|help|status|identity|workspaces)(?:\s|$)/.test(args) ||
+      /^(?:work-item-types|workflows)(?:\s|$)/.test(args) ||
+      /^work-items\s+(?:list|get|history)(?:\s|$)/.test(args)
+    ) {
+      continue;
+    }
+    if (/\b(?:create|update|edit|delete|transition|complete|close|bind)\b/i.test(args)) {
+      throw new Error(`Codex used a write-like TAPD command: ${segment}`);
+    }
+    throw new Error(`Codex used an unsupported TAPD command: ${segment}`);
+  }
+};
+
+export const assertReadOnlyTapdActivity = (stdout, requiredOperations = []) => {
+  const commands = [];
+  const operations = new Set();
+  const prohibitedItemTypes = new Set([
+    "file_change",
+    "mcp_tool_call",
+    "web_search",
+    "computer_use",
+    "image_generation",
+  ]);
+
+  for (const event of parseCodexEvents(stdout)) {
+    if (prohibitedItemTypes.has(event?.item?.type)) {
+      throw new Error(`Codex used prohibited tool activity: ${event.item.type}`);
+    }
+    assertNoSandboxFailure(event);
+    if (event?.item?.type !== "command_execution") continue;
+
+    const command = Array.isArray(event.item.command)
+      ? event.item.command.join(" ")
+      : String(event.item.command || "");
+    assertTapdOnlyCommand(command);
+    commands.push(command);
+
+    const commandOutput = [event.item.aggregated_output, event.item.output]
+      .filter((value) => value !== undefined)
+      .join("\n");
+    for (const match of commandOutput.matchAll(/"fixture_operation"\s*:\s*"([^"]+)"/g)) {
+      operations.add(match[1]);
     }
   }
+
+  if (commands.length === 0) throw new Error("Codex did not inspect the TAPD CLI");
+  const missingOperations = requiredOperations.filter((operation) => !operations.has(operation));
+  if (missingOperations.length > 0) {
+    throw new Error(`Codex is missing required TAPD reads: ${missingOperations.join(", ")}`);
+  }
+  return [...new Set(commands)];
 };
 
 const runTriggerCase = async (triggerCase) => {
@@ -273,7 +530,6 @@ const runTriggerCase = async (triggerCase) => {
   const authRoot = await mkdtemp(path.join(os.tmpdir(), "the-way-of-roxi-codex-auth-"));
   const isolatedHome = path.join(tempRoot, "home");
   const isolatedCodexHome = path.join(authRoot, "codex-home");
-  const outputPath = path.join(tempRoot, "final.txt");
   const sourceCodexHome = process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
 
   try {
@@ -284,56 +540,111 @@ const runTriggerCase = async (triggerCase) => {
       "# Trigger Evaluation Repository\n\nThis repository contains a small documentation example.\n",
     );
     await createEvalSkill({
-      sourceSkill: path.join(root, "skills", triggerCase.id),
+      sourceSkill: path.join(root, "skills", triggerCase.sourceSkillId || triggerCase.id),
       skillsRoot: path.join(tempRoot, ".agents", "skills"),
       evalName: triggerCase.evalName,
     });
 
+    const fakeBin = path.join(tempRoot, "fake-bin");
+    if (triggerCase.useFakeTapd) {
+      await mkdir(fakeBin, { recursive: true });
+      const fakeTapdPath = path.join(fakeBin, "tapd-cli");
+      await cp(path.join(root, "tests", "fixtures", "fake-tapd-cli"), fakeTapdPath);
+      await chmod(fakeTapdPath, 0o755);
+    }
+
     const codexBin = await resolveExecutable(process.env.CODEX_BIN || "codex");
-    const runtimePath = [path.dirname(process.execPath), "/usr/bin", "/bin", "/usr/sbin", "/sbin"].join(
-      path.delimiter,
-    );
+    const toolPath = [
+      ...(triggerCase.useFakeTapd ? [fakeBin] : []),
+      "/usr/bin",
+      "/bin",
+      "/usr/sbin",
+      "/sbin",
+    ].join(path.delimiter);
+    const runtimePath = [path.dirname(process.execPath), toolPath].join(path.delimiter);
     const environment = sanitizeEnvironment(process.env, {
       home: isolatedHome,
       codexHome: isolatedCodexHome,
       runtimePath,
     });
 
-    let result;
-    try {
-      result = await runProcessWithClosedStdin({
-        file: codexBin,
-        args: buildCodexArgs({
-          workdir: tempRoot,
-          outputPath,
-          prompt: triggerCase.prompt,
-          toolHome: isolatedHome,
-          toolPath: "/usr/bin:/bin:/usr/sbin:/sbin",
-        }),
-        cwd: tempRoot,
-        env: environment,
-        maxBuffer: 64 * 1024 * 1024,
-        timeoutMs: 300_000,
-      });
-    } catch (error) {
-      throw new Error(`${triggerCase.id} Codex run failed:\n${describeCodexFailure(error)}`);
+    const turns = triggerCase.turns || [
+      {
+        behavior: triggerCase.id,
+        prompt: triggerCase.prompt,
+        toolPolicy: triggerCase.toolPolicy || "none",
+      },
+    ];
+    let threadId;
+
+    for (const [turnIndex, turn] of turns.entries()) {
+      const outputPath = path.join(tempRoot, `final-${turnIndex + 1}.txt`);
+      const args =
+        turnIndex === 0
+          ? buildCodexArgs({
+              workdir: tempRoot,
+              outputPath,
+              prompt: turn.prompt,
+              toolHome: isolatedHome,
+              toolPath,
+              ephemeral: turns.length === 1,
+            })
+          : buildCodexResumeArgs({
+              threadId,
+              outputPath,
+              prompt: turn.prompt,
+              toolHome: isolatedHome,
+              toolPath,
+            });
+
+      let result;
+      try {
+        result = await runProcessWithClosedStdin({
+          file: codexBin,
+          args,
+          cwd: tempRoot,
+          env: environment,
+          maxBuffer: 64 * 1024 * 1024,
+          timeoutMs: 300_000,
+        });
+      } catch (error) {
+        throw new Error(
+          `${triggerCase.id} turn ${turnIndex + 1} Codex run failed:\n${describeCodexFailure(error)}`,
+        );
+      }
+
+      try {
+        if (turn.toolPolicy === "tapd-read-only") {
+          assertReadOnlyTapdActivity(
+            result.stdout,
+            turn.requiredTapdReads || triggerCase.requiredTapdReads || [],
+          );
+        } else {
+          assertNoToolActivity(result.stdout);
+        }
+        const output = await resolveCodexOutput({ outputPath, stdout: result.stdout });
+        if (triggerCase.id === "tapd-summary-negative") {
+          assertSummaryNotTriggered(output, triggerCase.evalName);
+        } else {
+          assertTriggerBehavior(turn.behavior, output, triggerCase.evalName);
+        }
+        if (turnIndex === 0 && turns.length > 1) threadId = resolveThreadId(result.stdout);
+      } catch (error) {
+        throw new Error(
+          `${triggerCase.id} turn ${turnIndex + 1} output could not be verified:\n${formatProcessFailure({
+            message: error instanceof Error ? error.message : String(error),
+            stdout: result.stdout,
+            stderr: result.stderr,
+          })}`,
+        );
+      }
     }
 
-    let output;
-    try {
-      assertNoToolActivity(result.stdout);
-      output = await resolveCodexOutput({ outputPath, stdout: result.stdout });
-    } catch (error) {
-      throw new Error(
-        `${triggerCase.id} Codex output could not be resolved:\n${formatProcessFailure({
-          message: error instanceof Error ? error.message : String(error),
-          stdout: result.stdout,
-          stderr: result.stderr,
-        })}`,
-      );
-    }
-    assertTriggerBehavior(triggerCase.id, output, triggerCase.evalName);
-    return { skill: triggerCase.id, mode: triggerCase.id === "tapd-summary" ? "explicit" : "implicit" };
+    let mode = "implicit";
+    if (triggerCase.id === "tapd-sync-lifecycle") mode = "stateful";
+    if (triggerCase.id === "tapd-summary-negative") mode = "negative";
+    else if (triggerCase.id.startsWith("tapd-summary")) mode = "explicit";
+    return { skill: triggerCase.id, mode };
   } finally {
     await Promise.all([
       rm(tempRoot, { recursive: true, force: true }),

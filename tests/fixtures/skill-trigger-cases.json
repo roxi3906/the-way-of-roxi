@@ -1,11 +1,37 @@
 {
   "targetAgents": [
+    "amp",
     "codex",
     "claude-code",
+    "cline",
     "cursor",
     "gemini-cli",
     "github-copilot",
-    "opencode"
+    "goose",
+    "kiro-cli",
+    "opencode",
+    "qwen-code",
+    "roo",
+    "windsurf"
+  ],
+  "agentInstallRoots": {
+    "amp": ".agents/skills",
+    "claude-code": ".claude/skills",
+    "cline": ".agents/skills",
+    "codex": ".agents/skills",
+    "cursor": ".agents/skills",
+    "gemini-cli": ".agents/skills",
+    "github-copilot": ".agents/skills",
+    "goose": ".goose/skills",
+    "kiro-cli": ".kiro/skills",
+    "opencode": ".agents/skills",
+    "qwen-code": ".qwen/skills",
+    "roo": ".roo/skills",
+    "windsurf": ".windsurf/skills"
+  },
+  "portableRuntimeSignalGroups": [
+    ["host runtime", "host agent"],
+    ["product-specific invocation prefix", "host-supported explicit invocation"]
   ],
   "skills": {
     "roxis-way": {
@@ -36,12 +62,19 @@
         "What time is it in Singapore?"
       ],
       "explicitInvocations": {
+        "amp": "/roxis-way",
         "codex": "$roxis-way",
         "claude-code": "/roxis-way",
+        "cline": "Use the roxis-way skill for this request.",
         "cursor": "/roxis-way",
         "gemini-cli": "Use the roxis-way skill for this request.",
         "github-copilot": "/roxis-way",
-        "opencode": "/roxis-way"
+        "goose": "/skills roxis-way",
+        "kiro-cli": "/roxis-way",
+        "opencode": "/roxis-way",
+        "qwen-code": "/roxis-way",
+        "roo": "Use the roxis-way skill for this request.",
+        "windsurf": "Use the roxis-way skill for this request."
       },
       "mayCoactivateWith": ["tapd-sync"]
     },
@@ -75,12 +108,19 @@
         "Use tapd-summary to summarize today's work."
       ],
       "explicitInvocations": {
+        "amp": "/tapd-sync",
         "codex": "$tapd-sync",
         "claude-code": "/tapd-sync",
+        "cline": "Use the tapd-sync skill for this request.",
         "cursor": "/tapd-sync",
         "gemini-cli": "Use the tapd-sync skill for this request.",
         "github-copilot": "/tapd-sync",
-        "opencode": "/tapd-sync"
+        "goose": "/skills tapd-sync",
+        "kiro-cli": "/tapd-sync",
+        "opencode": "/tapd-sync",
+        "qwen-code": "/tapd-sync",
+        "roo": "Use the tapd-sync skill for this request.",
+        "windsurf": "Use the tapd-sync skill for this request."
       },
       "mayCoactivateWith": ["roxis-way"]
     },
@@ -115,12 +155,19 @@
         "What should I work on tomorrow?"
       ],
       "explicitInvocations": {
+        "amp": "/tapd-summary",
         "codex": "$tapd-summary",
         "claude-code": "/tapd-summary",
+        "cline": "Use the tapd-summary skill for this request.",
         "cursor": "/tapd-summary",
         "gemini-cli": "Use the tapd-summary skill for this request.",
         "github-copilot": "/tapd-summary",
-        "opencode": "/tapd-summary"
+        "goose": "/skills tapd-summary",
+        "kiro-cli": "/tapd-summary",
+        "opencode": "/tapd-summary",
+        "qwen-code": "/tapd-summary",
+        "roo": "Use the tapd-summary skill for this request.",
+        "windsurf": "Use the tapd-summary skill for this request."
       },
       "mayCoactivateWith": []
     }
