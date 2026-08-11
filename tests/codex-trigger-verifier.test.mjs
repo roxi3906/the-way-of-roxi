@@ -250,6 +250,99 @@ test("Codex trigger evidence distinguishes repository workflow, TAPD sync, and e
       ),
     /selected candidate/,
   );
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "tapd-sync-query-default",
+      [
+        "SKILL_ACTIVATED: eval-tapd-sync-query-default",
+        "All matching nonterminal work items:",
+        "[【Trigger Evaluation Repository】Improve README agent documentation](https://tapd.example.invalid/workitems/parent)",
+        "The default nonterminal scope was applied.",
+      ].join("\n"),
+      "eval-tapd-sync-query-default",
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "tapd-sync-query-default",
+        [
+          "SKILL_ACTIVATED: eval-tapd-sync-query-default",
+          "[【Trigger Evaluation Repository】Improve README agent documentation](https://tapd.example.invalid/workitems/parent)",
+          "[【Trigger Evaluation Repository】Improve README agent documentation (completed)](https://tapd.example.invalid/workitems/parent-done)",
+        ].join("\n"),
+        "eval-tapd-sync-query-default",
+      ),
+    /default an all-items query to nonterminal results/,
+  );
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "tapd-sync-query-inclusive",
+      [
+        "SKILL_ACTIVATED: eval-tapd-sync-query-inclusive",
+        "[【Trigger Evaluation Repository】Improve README agent documentation](https://tapd.example.invalid/workitems/parent)",
+        "[【Trigger Evaluation Repository】Improve README agent documentation (completed)](https://tapd.example.invalid/workitems/parent-done)",
+      ].join("\n"),
+      "eval-tapd-sync-query-inclusive",
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "tapd-sync-query-inclusive",
+        [
+          "SKILL_ACTIVATED: eval-tapd-sync-query-inclusive",
+          "[【Trigger Evaluation Repository】Improve README agent documentation](https://tapd.example.invalid/workitems/parent)",
+          "The completed item was omitted: 【Trigger Evaluation Repository】Improve README agent documentation (completed)",
+        ].join("\n"),
+        "eval-tapd-sync-query-inclusive",
+      ),
+    /include terminal results/,
+  );
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "tapd-sync-query-inclusive-incomplete",
+      [
+        "SKILL_ACTIVATED: eval-tapd-sync-query-inclusive-incomplete",
+        "[【Trigger Evaluation Repository】Improve README agent documentation](https://tapd.example.invalid/workitems/parent)",
+        "Terminal coverage is incomplete, so this is not a complete terminal-inclusive result.",
+      ].join("\n"),
+      "eval-tapd-sync-query-inclusive-incomplete",
+    ),
+  );
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "tapd-sync-query-inclusive-incomplete",
+      [
+        "SKILL_ACTIVATED: eval-tapd-sync-query-inclusive-incomplete",
+        "[【Trigger Evaluation Repository】Improve README agent documentation](https://tapd.example.invalid/workitems/parent)",
+        "Not all terminal work items were returned because terminal coverage is incomplete.",
+      ].join("\n"),
+      "eval-tapd-sync-query-inclusive-incomplete",
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "tapd-sync-query-inclusive-incomplete",
+        "SKILL_ACTIVATED: eval-tapd-sync-query-inclusive-incomplete\n[【Trigger Evaluation Repository】Improve README agent documentation](https://tapd.example.invalid/workitems/parent)\nAll matching work items were returned.",
+        "eval-tapd-sync-query-inclusive-incomplete",
+      ),
+    /report incomplete terminal coverage/,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "tapd-sync-query-inclusive-incomplete",
+        [
+          "SKILL_ACTIVATED: eval-tapd-sync-query-inclusive-incomplete",
+          "[【Trigger Evaluation Repository】Improve README agent documentation](https://tapd.example.invalid/workitems/parent)",
+          "Terminal coverage is incomplete, but all matching work items were returned.",
+        ].join("\n"),
+        "eval-tapd-sync-query-inclusive-incomplete",
+      ),
+    /report incomplete terminal coverage/,
+  );
   assert.throws(
     () =>
       assertTriggerBehavior(
@@ -573,6 +666,9 @@ test("Codex trigger verification can select one case without weakening the defau
       "roxis-way",
       "tapd-sync",
       "tapd-sync-lifecycle",
+      "tapd-sync-query-default",
+      "tapd-sync-query-inclusive",
+      "tapd-sync-query-inclusive-incomplete",
       "tapd-summary-negative",
       "tapd-summary",
       "tapd-summary-capable",
@@ -586,6 +682,9 @@ test("Codex trigger verification can select one case without weakening the defau
   assert.match(selectTriggerCases("tapd-summary")[0].prompt, /^\$eval-tapd-summary\b/);
   assert.equal(selectTriggerCases("tapd-sync-lifecycle")[0].turns.length, 3);
   assert.equal(selectTriggerCases("tapd-sync-lifecycle")[0].useFakeTapd, true);
+  assert.equal(selectTriggerCases("tapd-sync-query-default")[0].useFakeTapd, true);
+  assert.equal(selectTriggerCases("tapd-sync-query-inclusive")[0].useFakeTapd, true);
+  assert.equal(selectTriggerCases("tapd-sync-query-inclusive-incomplete")[0].fakeTapdScenario, "terminal-coverage-incomplete");
   assert.equal(selectTriggerCases("tapd-summary-capable")[0].useFakeTapd, true);
   assert.doesNotMatch(selectTriggerCases("tapd-summary-negative")[0].prompt, /TAPD/i);
   assert.throws(() => selectTriggerCases("missing-skill"), /Unknown Codex trigger case/);
