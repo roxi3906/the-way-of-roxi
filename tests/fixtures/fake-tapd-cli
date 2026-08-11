@@ -17,6 +17,11 @@ argument_value() {
 
 today=2026-08-03
 command_name=${1:---help}
+fixture_directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+terminal_coverage_complete=true
+if [ -f "$fixture_directory/terminal-coverage-incomplete" ]; then
+  terminal_coverage_complete=false
+fi
 
 case "$command_name" in
   --help|-h|help)
@@ -61,7 +66,11 @@ EOF
       printf '%s\n' '{"fixture_operation":"workflows-invalid","error":"workspace_not_found"}' >&2
       exit 3
     fi
-    printf '%s\n' '{"fixture_operation":"workflows","statuses":[{"id":"open","name":"Open","terminal":false},{"id":"done","name":"Done","terminal":true,"successful":true}],"transitions":[{"from":"open","to":"done"}]}'
+    if [ "$terminal_coverage_complete" = "true" ]; then
+      printf '%s\n' '{"fixture_operation":"workflows","statuses":[{"id":"open","name":"Open","terminal":false},{"id":"done","name":"Done","terminal":true,"successful":true}],"transitions":[{"from":"open","to":"done"}],"complete":true}'
+    else
+      printf '%s\n' '{"fixture_operation":"workflows","statuses":[{"id":"open","name":"Open","terminal":false}],"transitions":[],"complete":false}'
+    fi
     ;;
   work-items)
     action=${2:-}
@@ -74,7 +83,11 @@ EOF
         fi
         model=$(argument_value --model "$@" || true)
         if [ "$model" = "stories" ]; then
-          printf '{"fixture_operation":"work-items-list-stories","items":[{"id":"parent-1","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Improve README agent documentation","description":"Document the supported agent installation flow for this repository.","status":"Open","status_id":"open","owner":"roxi;","creator":"roxi","created":"%sT09:00:00+08:00","modified":"%sT09:30:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent"}],"page":1,"has_more":false}\n' "$today" "$today"
+          if [ "$terminal_coverage_complete" = "true" ]; then
+            printf '{"fixture_operation":"work-items-list-stories","items":[{"id":"parent-1","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Improve README agent documentation","description":"Document the supported agent installation flow for this repository.","status":"Open","status_id":"open","owner":"roxi;","creator":"roxi","created":"%sT09:00:00+08:00","modified":"%sT09:30:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent"},{"id":"parent-done","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Improve README agent documentation (completed)","description":"Document the supported agent installation flow for this repository.","status":"Done","status_id":"done","owner":"roxi;","creator":"roxi","created":"%sT08:00:00+08:00","modified":"%sT08:30:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent-done"}],"page":1,"has_more":false}\n' "$today" "$today" "$today" "$today"
+          else
+            printf '{"fixture_operation":"work-items-list-stories","items":[{"id":"parent-1","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Improve README agent documentation","description":"Document the supported agent installation flow for this repository.","status":"Open","status_id":"open","owner":"roxi;","creator":"roxi","created":"%sT09:00:00+08:00","modified":"%sT09:30:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent"}],"page":1,"has_more":false}\n' "$today" "$today"
+          fi
         else
           printf '{"fixture_operation":"work-items-list-%s","items":[],"page":1,"has_more":false}\n' "$model"
         fi

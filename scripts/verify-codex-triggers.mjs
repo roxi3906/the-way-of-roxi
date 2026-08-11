@@ -59,6 +59,34 @@ const triggerCases = [
     ],
   },
   {
+    id: "tapd-sync-query-default",
+    sourceSkillId: "tapd-sync",
+    evalName: "eval-tapd-sync-query-default",
+    useFakeTapd: true,
+    toolPolicy: "tapd-read-only",
+    requiredTapdReads: tapdInitializationReads,
+    prompt: "Use the authenticated read-only tapd-cli available in PATH to find all TAPD work items related to README agent documentation. Do not read or edit repository files.",
+  },
+  {
+    id: "tapd-sync-query-inclusive",
+    sourceSkillId: "tapd-sync",
+    evalName: "eval-tapd-sync-query-inclusive",
+    useFakeTapd: true,
+    toolPolicy: "tapd-read-only",
+    requiredTapdReads: tapdInitializationReads,
+    prompt: "Use the authenticated read-only tapd-cli available in PATH to find TAPD work items related to README agent documentation, explicitly including completed, closed, and other terminal work items. Do not read or edit repository files.",
+  },
+  {
+    id: "tapd-sync-query-inclusive-incomplete",
+    sourceSkillId: "tapd-sync",
+    evalName: "eval-tapd-sync-query-inclusive-incomplete",
+    useFakeTapd: true,
+    fakeTapdScenario: "terminal-coverage-incomplete",
+    toolPolicy: "tapd-read-only",
+    requiredTapdReads: tapdInitializationReads,
+    prompt: "Use the authenticated read-only tapd-cli available in PATH to find TAPD work items related to README agent documentation, explicitly including completed, closed, and other terminal work items. Do not read or edit repository files.",
+  },
+  {
     id: "tapd-summary-negative",
     sourceSkillId: "tapd-summary",
     evalName: "eval-tapd-summary-negative",
@@ -230,7 +258,8 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     if (
       !/README/i.test(output) ||
       !/^>?\s*TAPD:\s/.test(finalLine) ||
-      !/\[【Trigger Evaluation Repository】Improve README agent documentation\]\(https:\/\/tapd\.example\.invalid\/workitems\/parent\)/.test(finalLine)
+      !/\[【Trigger Evaluation Repository】Improve README agent documentation\]\(https:\/\/tapd\.example\.invalid\/workitems\/parent\)/.test(finalLine) ||
+      /workitems\/parent-done/.test(output)
     ) {
       throw new Error("tapd-sync did not perform the first read-only match and link its candidate");
     }
@@ -283,6 +312,46 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     return;
   }
 
+  if (caseId === "tapd-sync-query-default") {
+    if (
+      !/\[【Trigger Evaluation Repository】Improve README agent documentation\]\(https:\/\/tapd\.example\.invalid\/workitems\/parent\)/.test(output) ||
+      /workitems\/parent-done/.test(output) ||
+      !/(?:非终态.{0,24}(?:范围|工作项)|(?:范围|工作项).{0,24}非终态|non[- ]?terminal.{0,24}(?:scope|items?))/i.test(output)
+    ) {
+      throw new Error("tapd-sync did not default an all-items query to nonterminal results and report that scope");
+    }
+    return;
+  }
+
+  if (caseId === "tapd-sync-query-inclusive") {
+    if (
+      !/\[【Trigger Evaluation Repository】Improve README agent documentation\]\(https:\/\/tapd\.example\.invalid\/workitems\/parent\)/.test(output) ||
+      !/\[【Trigger Evaluation Repository】Improve README agent documentation \(completed\)\]\(https:\/\/tapd\.example\.invalid\/workitems\/parent-done\)/.test(output)
+    ) {
+      throw new Error("tapd-sync did not include terminal results after an explicit scope request");
+    }
+    return;
+  }
+
+  if (caseId === "tapd-sync-query-inclusive-incomplete") {
+    const completeCoverageClaim =
+      /\b(?:all|every)\b.{0,50}\b(?:returned|included)\b|(?:全部|所有).{0,40}(?:已返回|均已返回|已包含)|(?:(?:query|search|terminal(?:-inclusive)?)\s+)?(?:results?|coverage)\s+(?:is|are)\s+complete\b|(?:查询|检索|终态)?(?:结果|覆盖)(?:为|是)?(?:完整|全量)/i;
+    const negatedOrPartial =
+      /\b(?:not|cannot|can't|unable|incomplete|partial)\b|(?:无法|不能|未能|并非|不是|不完整|部分)/i;
+    const claimsCompleteCoverage = output
+      .split(/\r?\n|[。；;]|,\s*(?:but|however)\s+|(?:，|,)?\s*(?:但|但是|不过|然而)\s*/i)
+      .some((clause) => !negatedOrPartial.test(clause) && completeCoverageClaim.test(clause));
+    if (
+      !/\[【Trigger Evaluation Repository】Improve README agent documentation\]\(https:\/\/tapd\.example\.invalid\/workitems\/parent\)/.test(output) ||
+      /workitems\/parent-done/.test(output) ||
+      claimsCompleteCoverage ||
+      !/(?:无法|不能|未能|不完整|受限|incomplete|cannot|unable|limitation).{0,40}(?:终态|terminal)|(?:终态|terminal).{0,40}(?:无法|不能|未能|不完整|受限|incomplete|cannot|unable|limitation)/i.test(output)
+    ) {
+      throw new Error("tapd-sync did not report incomplete terminal coverage without claiming complete results");
+    }
+    return;
+  }
+
   if (caseId === "tapd-summary") {
     if (!/TAPD/i.test(output) || !/(unavailable|not configured|不可用|无法)/i.test(output)) {
       throw new Error("tapd-summary did not report unavailable read-only summary data");
@@ -292,7 +361,7 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
 
   if (caseId === "tapd-summary-capable") {
     if (
-      !/【Trigger Evaluation Repository】Improve README agent documentation/.test(output) ||
+      !/【Trigger Evaluation Repository】Improve README agent documentation(?! \(completed\))/.test(output) ||
       /(unavailable|not configured|不可用|无法)/i.test(output)
     ) {
       throw new Error("tapd-summary did not use the capable read-only adapter data");
@@ -551,6 +620,9 @@ const runTriggerCase = async (triggerCase) => {
       const fakeTapdPath = path.join(fakeBin, "tapd-cli");
       await cp(path.join(root, "tests", "fixtures", "fake-tapd-cli"), fakeTapdPath);
       await chmod(fakeTapdPath, 0o755);
+      if (triggerCase.fakeTapdScenario) {
+        await writeFile(path.join(fakeBin, triggerCase.fakeTapdScenario), "");
+      }
     }
 
     const codexBin = await resolveExecutable(process.env.CODEX_BIN || "codex");
