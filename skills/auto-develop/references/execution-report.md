@@ -2,9 +2,18 @@
 
 Use this contract to keep autonomous delivery traceable without turning the report into a command transcript.
 
+## Contents
+
+- [Maintain the Decision Ledger](#maintain-the-decision-ledger)
+- [Use Unambiguous Status Records](#use-unambiguous-status-records)
+- [Render the Final Report](#render-the-final-report)
+- [End After a Verified Draft PR or Risk-Gate Pause](#end-after-a-verified-draft-pr-or-risk-gate-pause)
+
 ## Maintain the Decision Ledger
 
-Create one entry for each material decision when it occurs:
+Create an untracked Markdown file in the host's project-private planning directory before the first material decision. Initialize it with the user's goal and the absolute ledger path. Do not use conversation context as the only copy.
+
+Immediately after each material decision, append this immutable record and read the appended content back:
 
 ```text
 D-<sequence> <decision title>
@@ -17,10 +26,20 @@ Reason: <why this option best satisfies the task>
 Risk: <low, medium, high and the concrete exposure>
 Reversibility: <how the choice can be undone, or irreversible>
 User involvement: <not required, authorized by invocation, or explicitly required>
-Outcome: <verified final result; put the next decision in Evidence or explanatory prose>
+Outcome: pending verification
 ```
 
-Record material choices about workflow precedence, source branch, worktree, tracking, requirements, implementation approach, validation, review fixes, and pull-request delivery. Omit trivial shell syntax and mechanically determined steps. Keep rejected alternatives when they explain why the chosen branch was safer or more correct.
+Never edit, replace, or reorder an earlier record. When the result becomes known, append an outcome update and read it back:
+
+```text
+Update D-<sequence> Outcome
+Evidence: <tool, repository, runtime, test, or read-back evidence>
+Outcome: <verified final result>
+```
+
+Record material choices about workflow precedence, source branch, worktree, tracking, requirements, implementation approach, validation, review fixes, and pull-request delivery. Omit trivial shell syntax and mechanically determined steps. Keep rejected alternatives when they explain why the chosen branch was safer or more correct. Use child identifiers such as `D-05.1` when a phase contains multiple material decisions.
+
+At the start of every later turn, resumed session, or context-restored continuation, read the ledger before deciding or acting. If it is missing, recover only from verified preserved evidence and append a recovery record; never silently reconstruct an audit trail from memory. Keep the file untracked unless the user explicitly requests a shared artifact.
 
 ## Use Unambiguous Status Records
 
@@ -35,6 +54,7 @@ Selected source branch: <verified branch>
 Starting commit: <full verified commit hash>.
 Task branch: <verified Git-valid task branch>.
 Worktree: <absolute path>; state ready.
+Decision ledger read-back: <absolute private .md path>; format Markdown; append-only updates verified; all reported nodes reconciled.
 Tracking match: unique candidate at <score>.
 Tracking creation readiness: <score, when creation is considered>
 Tracking action: <automatically bound | automatically created and bound | unavailable>
@@ -54,7 +74,7 @@ Resume condition: <observable condition>
 
 Use `Tracking match: none.` when no candidate qualifies. For a conflict, list every qualifying candidate's distinct identity and score as semicolon-delimited entries in the single `Tracking match` record, omit `Tracking action`, and report `Tracking write: none.`.
 
-After a successful bind or create-and-bind action, include `Tracking read-back` only after the destination item has been fetched and its bound state verified. A successful delivery must also include the worktree path with `state ready`; attempted, failed, pending, or placeholder states are not success evidence.
+After a successful bind or create-and-bind action, include `Tracking read-back` only after the destination item has been fetched and its bound state verified. A successful delivery must also include the worktree path with `state ready` and the verified decision-ledger read-back record; attempted, failed, pending, or placeholder states are not success evidence.
 
 Use exactly four semicolon-delimited fields for a successful draft PR record: `URL`, `state draft`, `base`, and `head`, in that order. The head must exactly equal the recorded task branch and differ from the base. Do not append another state or a conflicting qualification.
 
@@ -72,7 +92,7 @@ Use destination language rules and include these sections when applicable:
 4. **Verification**: List commands or checks with their final results. For every command, emit `Command: <actual command>` followed by `Result: <verified result>`. Distinguish direct, expanded, and substituted coverage.
 5. **Deep Review**: List findings by severity, the recommended fixes applied, re-review outcome, and any residual risk.
 6. **Draft PR**: Link the verified draft PR and state its base and head branches.
-7. **Decision Tree**: Render every ledger entry as a connected tree rooted at the user's goal.
+7. **Decision Tree**: Render every ledger decision record as a connected tree rooted at the user's goal. Consolidate each record with its latest verified outcome update; do not omit child decisions.
 
 Render the tree in execution order and include every delivery phase:
 
@@ -83,12 +103,13 @@ User goal
 |- D-03 Tracking
 |- D-04 Requirements
 |- D-05 Implementation
+|- D-05.1 Implementation approach
 |- D-06 Verification
 |- D-07 Review fixes
 `- D-08 Draft PR
 ```
 
-Follow the tree with this decision-details table. Populate every cell for every phase; use `not applicable` only when the phase genuinely had no alternative or user-involvement state.
+Follow the tree with this decision-details table. Populate every cell for every decision; use `not applicable` only when the decision genuinely had no alternative or user-involvement state.
 
 ```text
 | Node | Trigger | Evidence | Options | Choice | Reason | Risk | Reversibility | User involvement | Outcome |
@@ -97,14 +118,26 @@ Follow the tree with this decision-details table. Populate every cell for every 
 | Tracking | ... | ... | ... | ... | ... | ... | ... | ... | ... |
 | Requirements | ... | ... | ... | ... | ... | ... | ... | ... | ... |
 | Implementation | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+| Implementation approach | ... | ... | ... | ... | ... | ... | ... | ... | ... |
 | Verification | ... | ... | ... | ... | ... | ... | ... | ... | ... |
 | Review fixes | ... | ... | ... | ... | ... | ... | ... | ... | ... |
 | Draft PR | ... | ... | ... | ... | ... | ... | ... | ... | ... |
 ```
 
-For English reports, use these exact `Outcome` values in phase order: `Base recorded`, `Worktree ready`, `Read-back verified`, `Criteria mapped`, `Behavior implemented`, `Passed`, `Re-review clean`, and `URL and refs verified`. Put details and the next decision in `Evidence` or explanatory prose. Translate these values consistently for a non-English destination. Keep failed attempts and recovered history in explanatory prose, not in the final outcome cell.
+Include one table row for every tree node, including child decisions, in the same order as the tree. For English reports, use these exact `Outcome` values for the eight required phase rows in phase order: `Base recorded`, `Worktree ready`, `Read-back verified`, `Criteria mapped`, `Behavior implemented`, `Passed`, `Re-review clean`, and `URL and refs verified`. Use the actual verified outcome for child decisions. Put details and the next decision in `Evidence` or explanatory prose. Translate these values consistently for a non-English destination. Keep failed attempts and recovered history in explanatory prose, not in the final outcome cell.
 
 Do not invent branches or evidence that were not considered during execution.
+
+Before emitting the terminal response, re-read this contract and the ledger, then verify all of the following:
+
+- the decision-ledger read-back record contains its absolute private Markdown path;
+- every appended decision appears once in the tree and once in the table;
+- every table cell is populated and every outcome uses the latest verified update;
+- all eight delivery phases appear in order for a successful delivery;
+- a paused delivery includes every decision accumulated through the blocker;
+- the final status records contain no attempted, stale, or contradictory success claim.
+
+Do not emit a terminal response until this preflight passes.
 
 ## End After a Verified Draft PR or Risk-Gate Pause
 
