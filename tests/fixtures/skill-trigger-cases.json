@@ -29,11 +29,136 @@
     "roo": ".roo/skills",
     "windsurf": ".windsurf/skills"
   },
+  "agentProfiles": {
+    "amp": {
+      "installRoot": ".agents/skills",
+      "invocationTemplate": "/{skill}",
+      "invocationForm": "slash",
+      "manualOnlyControl": "runtime-gate"
+    },
+    "codex": {
+      "installRoot": ".agents/skills",
+      "invocationTemplate": "${skill}",
+      "invocationForm": "dollar",
+      "manualOnlyControl": "openai-policy"
+    },
+    "claude-code": {
+      "installRoot": ".claude/skills",
+      "invocationTemplate": "/{skill}",
+      "invocationForm": "slash",
+      "manualOnlyControl": "runtime-gate"
+    },
+    "cline": {
+      "installRoot": ".agents/skills",
+      "invocationTemplate": "Use the {skill} skill for this request.",
+      "invocationForm": "direct-instruction",
+      "manualOnlyControl": "runtime-gate"
+    },
+    "cursor": {
+      "installRoot": ".agents/skills",
+      "invocationTemplate": "/{skill}",
+      "invocationForm": "slash",
+      "manualOnlyControl": "runtime-gate"
+    },
+    "gemini-cli": {
+      "installRoot": ".agents/skills",
+      "invocationTemplate": "Use the {skill} skill for this request.",
+      "invocationForm": "direct-instruction",
+      "manualOnlyControl": "runtime-gate"
+    },
+    "github-copilot": {
+      "installRoot": ".agents/skills",
+      "invocationTemplate": "/{skill}",
+      "invocationForm": "slash",
+      "manualOnlyControl": "runtime-gate"
+    },
+    "goose": {
+      "installRoot": ".goose/skills",
+      "invocationTemplate": "/skills {skill}",
+      "invocationForm": "skills-command",
+      "manualOnlyControl": "runtime-gate"
+    },
+    "kiro-cli": {
+      "installRoot": ".kiro/skills",
+      "invocationTemplate": "/{skill}",
+      "invocationForm": "slash",
+      "manualOnlyControl": "runtime-gate"
+    },
+    "opencode": {
+      "installRoot": ".agents/skills",
+      "invocationTemplate": "/{skill}",
+      "invocationForm": "slash",
+      "manualOnlyControl": "opencode-autoinvoke"
+    },
+    "qwen-code": {
+      "installRoot": ".qwen/skills",
+      "invocationTemplate": "/{skill}",
+      "invocationForm": "slash",
+      "manualOnlyControl": "runtime-gate"
+    },
+    "roo": {
+      "installRoot": ".roo/skills",
+      "invocationTemplate": "Use the {skill} skill for this request.",
+      "invocationForm": "direct-instruction",
+      "manualOnlyControl": "runtime-gate"
+    },
+    "windsurf": {
+      "installRoot": ".windsurf/skills",
+      "invocationTemplate": "Use the {skill} skill for this request.",
+      "invocationForm": "direct-instruction",
+      "manualOnlyControl": "runtime-gate"
+    }
+  },
   "portableRuntimeSignalGroups": [
     ["host runtime", "host agent"],
     ["product-specific invocation prefix", "host-supported explicit invocation"]
   ],
   "skills": {
+    "auto-develop": {
+      "invocationPolicy": "explicit-only",
+      "frontloadCharacters": 420,
+      "frontloadedSignalGroups": [
+        ["autonomous", "automatically"],
+        ["explicit", "explicitly"],
+        ["$auto-develop"],
+        ["/auto-develop", "use the auto-develop skill"]
+      ],
+      "negativeDescriptionSignalGroups": [
+        ["only when", "explicitly"],
+        ["never invoke automatically"],
+        ["ordinary"],
+        ["automatic development", "auto development", "自动开发"]
+      ],
+      "positivePrompts": [
+        "$auto-develop Implement this repository feature end to end.",
+        "/skills auto-develop Deliver this change autonomously and report the decision tree.",
+        "Use the auto-develop skill to fix this defect and open a draft pull request."
+      ],
+      "paraphrasePrompts": [
+        "/auto-develop 全自动完成这个仓库任务并提供决策树。",
+        "I selected auto-develop; deliver this change through a reviewed draft PR."
+      ],
+      "negativePrompts": [
+        "Automatically implement this repository feature.",
+        "请自动开发这个功能并完成代码审查。"
+      ],
+      "explicitInvocations": {
+        "amp": "/auto-develop",
+        "codex": "$auto-develop",
+        "claude-code": "/auto-develop",
+        "cline": "Use the auto-develop skill for this request.",
+        "cursor": "/auto-develop",
+        "gemini-cli": "Use the auto-develop skill for this request.",
+        "github-copilot": "/auto-develop",
+        "goose": "/skills auto-develop",
+        "kiro-cli": "/auto-develop",
+        "opencode": "/auto-develop",
+        "qwen-code": "/auto-develop",
+        "roo": "Use the auto-develop skill for this request.",
+        "windsurf": "Use the auto-develop skill for this request."
+      },
+      "mayCoactivateWith": ["roxis-way", "tapd-sync"]
+    },
     "roxis-way": {
       "invocationPolicy": "implicit",
       "frontloadCharacters": 360,
@@ -76,7 +201,7 @@
         "roo": "Use the roxis-way skill for this request.",
         "windsurf": "Use the roxis-way skill for this request."
       },
-      "mayCoactivateWith": ["tapd-sync"]
+      "mayCoactivateWith": ["auto-develop", "tapd-sync"]
     },
     "tapd-sync": {
       "invocationPolicy": "implicit",
@@ -122,7 +247,7 @@
         "roo": "Use the tapd-sync skill for this request.",
         "windsurf": "Use the tapd-sync skill for this request."
       },
-      "mayCoactivateWith": ["roxis-way"]
+      "mayCoactivateWith": ["auto-develop", "roxis-way"]
     },
     "tapd-summary": {
       "invocationPolicy": "explicit-only",

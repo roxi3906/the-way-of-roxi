@@ -31,8 +31,9 @@ skills/<skill-name>/
 
 All skills follow the open Agent Skills specification. The `skills` CLI maps the same canonical skills into the discovery location supported by the selected compatible agent, so this repository does not maintain vendor-specific copies.
 
-It currently ships three skills:
+It currently ships four skills:
 
+- `skills/auto-develop/`: Explicitly invoked autonomous delivery through implementation, deep review, recommended fixes, a draft PR, and a traceable decision tree.
 - `skills/roxis-way/`: Reusable collaboration, implementation, testing, language, and delivery rules for any user.
 - `skills/tapd-sync/`: Session-aware TAPD work-item matching, binding, child-requirement creation, and commit-driven completion.
 - `skills/tapd-summary/`: Explicitly invoked, read-only daily work and next-day plan summaries grouped by project.
@@ -57,7 +58,16 @@ The locked `skills` CLI is exercised against a fresh temporary installation for 
 | Roo Code | `.roo/skills` | Loads matching skills on demand; name the skill explicitly when needed |
 | Windsurf | `.windsurf/skills` | Activates matching skills from their descriptions; name the skill explicitly when needed |
 
-Automatic selection is a model decision, so successful installation cannot guarantee implicit activation for every prompt. The descriptions intentionally front-load common English and Chinese trigger phrases. For deterministic use, explicitly say `Use the roxis-way skill ...`, `Use the tapd-sync skill ...`, or invoke the agent-specific command shown above. `tapd-summary` is deliberately explicit-only so ordinary requests for summaries or reports do not trigger TAPD access.
+Automatic selection is a model decision, so successful installation cannot guarantee implicit activation for every prompt. The descriptions intentionally front-load common English and Chinese trigger phrases. For deterministic use, explicitly say `Use the roxis-way skill ...`, `Use the tapd-sync skill ...`, or invoke the agent-specific command shown above. `auto-develop` and `tapd-summary` are deliberately explicit-only, so ordinary development, review, summary, or report requests do not activate them.
+
+Invoke `auto-develop` through the host Skill picker or its tested explicit form:
+
+- Codex: `$auto-develop`
+- Amp, Claude Code, Cursor, GitHub Copilot, Kiro CLI, OpenCode, and Qwen Code: `/auto-develop`
+- Goose: `/skills auto-develop`
+- Cline, Gemini CLI, Roo Code, and Windsurf: `Use the auto-develop skill for this request.`
+
+The canonical Skill combines a portable `invocation/manual-only: "true"` metadata contract, OpenCode's `opencode/autoinvoke: "false"`, Codex's `allow_implicit_invocation: false`, and an in-Skill invocation gate. Codex and OpenCode enforce their native controls before loading the Skill. Other hosts rely on explicit invocation plus the portable runtime gate because their native `disable-model-invocation` extension is not accepted by the repository's strict cross-agent Skill validator.
 
 ## Repository Layout
 
@@ -73,6 +83,12 @@ Automatic selection is a model decision, so successful installation cannot guara
 │   ├── verify-codex-triggers.mjs
 │   └── verify.mjs
 └── skills
+    ├── auto-develop
+    │   ├── SKILL.md
+    │   ├── agents
+    │   │   └── openai.yaml
+    │   └── references
+    │       └── execution-report.md
     ├── roxis-way
     │   ├── SKILL.md
     │   └── agents
@@ -95,13 +111,24 @@ Install one skill for selected agents:
 npx skills add roxi3906/the-way-of-roxi --skill roxis-way --agent codex claude-code cursor gemini-cli github-copilot opencode amp cline goose kiro-cli qwen-code roo windsurf --copy -y
 ```
 
-Replace `roxis-way` with `tapd-sync` or `tapd-summary` as needed. Inspect all available skills with:
+Replace `roxis-way` with `auto-develop`, `tapd-sync`, or `tapd-summary` as needed. Inspect all available skills with:
 
 ```bash
 npx skills add roxi3906/the-way-of-roxi --list
 ```
 
 ## Included Skills
+
+`auto-develop` performs an explicitly authorized autonomous delivery:
+
+- Runs only when selected through the host's Skill UI, invocation syntax, or a direct instruction to use the Skill
+- Treats invocation as task-scoped authorization for a dedicated worktree, commits, branch push, and a draft PR
+- Selects the first available source branch in `develop`, `dev/main`, `main`, `master` order and preserves it as the PR target
+- Reuses configured workflows, task synchronization, and progress monitoring; a unique match at or above 90% can be bound automatically
+- Makes recommended low-risk decisions while pausing only for indispensable user actions or material risk
+- Deeply reviews the completed diff, fixes every actionable in-scope recommendation, revalidates, and re-reviews
+- Reports the verified delivery with a detailed decision tree
+- Reminds the user that local worktree and branch cleanup can be requested after merge; cleanup is outside this Skill
 
 `roxis-way` defines defaults for:
 
@@ -149,7 +176,7 @@ npm install
 npm run verify
 ```
 
-`npm test` validates structured metadata, trigger contracts, negative boundaries, OpenAI policy, per-agent installations for all 13 supported agents, and the combined `--copy` quick-install path across every documented catalog root. `npm run verify:codex` additionally launches fresh, isolated, read-only Codex sessions for the repository workflow, TAPD Sync lifecycle, and explicit-only summary behavior. Single-turn cases remain ephemeral; the lifecycle case resumes one temporary session across the first match, a dormant reply, and candidate selection. Capable-adapter cases expose only a bundled read-only TAPD fixture and reject non-TAPD commands or write-like TAPD commands, while unavailable and negative cases reject all tool activity. The online smoke copies only the current `CODEX_HOME` authentication into an isolated temporary home, exposes no host credentials or live TAPD configuration to model tools, and fails clearly when Codex is not authenticated. Runtime activation behavior for other agents is documented from their product guidance; this repository verifies their locked CLI installation artifacts rather than launching authenticated sessions for every product.
+`npm test` validates structured metadata, host invocation profiles, positive and negative trigger contracts, manual-only controls, per-agent installations for all 13 supported agents, and the combined `--copy` quick-install path across every documented catalog root. Installation verification parses each copied `auto-develop` bundle and requires the portable intent contract plus the OpenCode and Codex native controls to survive unchanged. `npm run verify:codex` additionally launches fresh, isolated, read-only Codex sessions for explicit and negative Auto Develop behavior, the repository workflow, TAPD Sync lifecycle, and explicit-only summary behavior. Single-turn cases remain ephemeral; the lifecycle case resumes one temporary session across the first match, a dormant reply, and candidate selection. Capable-adapter cases expose only a bundled read-only TAPD fixture and reject non-TAPD commands or write-like TAPD commands, while unavailable and negative cases reject all tool activity. The online smoke copies only the current `CODEX_HOME` authentication into an isolated temporary home, exposes no host credentials or live TAPD configuration to model tools, and fails clearly when Codex is not authenticated. Runtime activation behavior for other agents is documented from their product guidance; this repository verifies their locked CLI installation artifacts rather than launching authenticated sessions for every product.
 
 ## License
 

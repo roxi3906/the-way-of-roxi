@@ -1,0 +1,6 @@
+interface:
+  display_name: "Auto Develop"
+  short_description: "Run explicit autonomous delivery with traceable decisions"
+  default_prompt: "Use $auto-develop to deliver this repository task autonomously through a reviewed draft PR and report the decision tree."
+policy:
+  allow_implicit_invocation: false

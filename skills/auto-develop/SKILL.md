@@ -1,0 +1,155 @@
+---
+name: auto-develop
+description: User-invoked only autonomous repository delivery. Invoke `auto-develop` explicitly through a host Skill selection, `$auto-develop`, `/auto-develop`, `/skills auto-develop` where supported, or a direct instruction to use the auto-develop Skill. It isolates work, implements and verifies the task, fixes deep-review findings, pushes a branch, opens a draft PR, and reports a decision tree. Never invoke automatically for ordinary automatic development, auto development, 自动开发, coding, implementation, review, or pull-request requests.
+metadata:
+  invocation/manual-only: "true"
+  opencode/autoinvoke: "false"
+---
+
+# Auto Develop
+
+Deliver the explicitly selected task without routine confirmation pauses. Preserve the user's existing workflows, make evidence-backed recommended decisions, and leave a complete execution trail.
+
+## Enforce the Invocation Gate
+
+Start only when the current request contains one of these explicit signals:
+
+- The host runtime reports that the user selected this Skill.
+- The request uses the host-supported explicit invocation for `auto-develop`, such as `$auto-develop`, `/auto-develop`, or `/skills auto-develop`.
+- The user directly instructs the agent to use the `auto-develop` Skill.
+
+If none applies, stop this Skill immediately. Do not treat phrases such as `automatic development`, `auto development`, `自动开发`, `work autonomously`, or `finish everything` as invocation. Do not depend on one product-specific invocation prefix; accept only explicit selection supported by the current host agent.
+
+## Apply the Explicit Authorization
+
+Treat invocation as the user's authorization for this task to:
+
+- select the recommended validation scope;
+- create a dedicated worktree and task branch;
+- modify task-scoped code, content, configuration, tests, and generated files;
+- create commits and push the task branch;
+- create a draft pull request targeting the recorded source branch;
+- automatically bind or create a configured tracking item when the 90% gate passes.
+
+Use this authorization only for the requested delivery. Continue to obey system and host permissions, repository instructions, credential and identity requirements, legal approvals, and any stronger safety rule. Never claim that invocation supplies a missing login, MFA response, secret, external approval, or required virtual-machine container authorization.
+
+Resolve workflow conflicts in this order:
+
+1. System rules, host permissions, and repository instructions.
+2. Explicit requirements in the user's current task.
+3. This task-scoped authorization.
+4. Configured workflows and other Skills.
+5. Repository conventions and recommended defaults.
+
+Treat the 90% tracking gate as one explicit exception: when it passes, invocation supplies any user confirmation that a tracking Skill normally requires for binding or creation. Preserve that Skill's identity, field, workflow, idempotency, read-back, and safety rules.
+
+## Start the Execution Ledger
+
+Read [references/execution-report.md](references/execution-report.md) completely before planning. Start its decision ledger immediately and update it when each material choice is made. Record evidence at decision time; do not reconstruct the tree from memory at the end.
+
+Keep the ledger in task context or the host's private planning area. Do not add it to the repository unless the user explicitly requests a tracked artifact.
+
+## 1. Discover the Delivery Context
+
+Inspect repository instructions, status, remotes, branches, existing worktrees, project tooling, validation commands, pull-request conventions, and available user-configured workflows or Skills. Read the complete instructions for every applicable Skill before using it. Reuse configured task synchronization and progress monitoring instead of creating parallel mechanisms.
+
+Treat invocation as selection of a dedicated worktree and the recommended risk-based validation scope, satisfying workflows that normally ask the user to choose those defaults. Continue without repeating those questions.
+
+Complete this phase only after the ledger identifies the applicable rules, available integrations, task boundary, and validation strategy.
+
+## 2. Select the Source and Isolate the Task
+
+Refresh branch information when the repository workflow permits it. Select the first branch that actually exists in this exact order:
+
+1. `develop`
+2. `dev/main`
+3. `main`
+4. `master`
+
+Record the source branch and exact starting commit. Create a dedicated task branch and worktree from that reference, following repository naming and placement rules. When the host has already provided a dedicated worktree for this exact invocation, use it as the required isolation instead of nesting another worktree.
+
+Preserve unrelated changes. Move pre-existing uncommitted work only when evidence shows it belongs to this task and the transfer is lossless. Pause under the risk gate when transfer could overwrite, omit, or mix another person's work.
+
+Complete this phase only when the ledger contains the source branch, starting commit, task branch, worktree path, and disposition of pre-existing changes.
+
+## 3. Synchronize Tracking and Monitoring
+
+Use the user's configured tracking Skill, CLI, API, or monitor. Preserve its adapter discovery, authentication, ownership, workflow, pagination, idempotency, and read-back rules.
+
+Use the integration's documented score when it exposes one. Otherwise calculate and record an evidence score out of 100:
+
+- Same substantive delivery objective: 50 points.
+- Same repository and project: 20 points.
+- Matching explicit identifiers, issue references, or branch evidence: 20 points.
+- Matching module, labels, acceptance context, or delivery metadata: 10 points.
+
+Cap a candidate below 90 when the substantive delivery objective is not equivalent. Reject terminal, wrong-project, or conflicting-scope candidates regardless of score.
+
+- Automatically bind one unique existing candidate scoring at least 90.
+- When no existing candidate qualifies, automatically create and bind only when the destination project or workspace, work-item type, owner, and proposed delivery scope are all verified and creation confidence is at least 90.
+- Apply the risk gate when multiple candidates qualify, destination evidence conflicts, or a required write field remains uncertain.
+- Record tracking as unavailable and continue the original task when no configured integration can be used.
+
+Verify every bind or create by reading the resulting state back before claiming success.
+
+## 4. Analyze and Decide
+
+Translate the request into observable acceptance criteria, constraints, affected paths, compatibility expectations, and verification evidence. Investigate answers available from the repository, runtime, configured tools, or authoritative sources.
+
+For ordinary ambiguity, choose the option with the strongest evidence and lowest task risk, record the alternatives and rationale, and continue. Ask the user only when the risk gate requires it.
+
+Complete this phase only when every acceptance criterion has an implementation path and a verification method.
+
+## 5. Implement and Verify
+
+Follow the repository's established implementation and comment rules. Prefer a failing test or equivalent observable baseline before changing behavior, then make the smallest coherent change that satisfies the acceptance criteria.
+
+Run directly related tests as work progresses. Diagnose and repair ordinary test failures, build failures, lint failures, and reproducible environment problems without pausing for the user. Expand validation when implementation evidence reveals wider risk, and record why.
+
+Complete this phase only when all acceptance criteria are implemented, applicable validation passes, and the working diff contains no known accidental changes.
+
+## 6. Review and Repair Deeply
+
+Fix the review boundary to the recorded source commit and the full task-branch diff. Invoke an applicable configured review Skill when available and follow it completely. Perform a dedicated review pass separate from implementation, covering at least:
+
+- requirement and acceptance-criteria compliance;
+- correctness, edge cases, state and data flow, and error handling;
+- security, privacy, destructive behavior, and permissions;
+- compatibility, migrations, concurrency, performance, and operations where applicable;
+- maintainability, repository standards, documentation accuracy, and test gaps.
+
+Rank findings by severity and include concrete evidence. Automatically fix every actionable recommended finding that belongs to the task and does not require a new product scope. Rerun affected validation, then review the updated diff again. Repeat until no actionable recommended finding remains.
+
+Apply the risk gate to a recommendation only when fixing it requires a major scope or business decision. Never silently defer a recommended finding; record the reason and residual risk when it cannot be resolved.
+
+## 7. Commit, Push, and Open the Draft PR
+
+Inspect the final diff and exclude unrelated files or hunks. Follow repository commit conventions, commit the verified task changes, and push the task branch. Treat invocation as the exact pull-request authorization required by stricter workflows.
+
+Read the repository PR template and recent comparable pull requests. Create a draft PR with the recorded source branch as the base and the task branch as the head. Never replace the recorded source with a generic default at this stage. Read the PR back and verify its URL, draft state, base, and head before reporting success.
+
+Do not merge the PR and do not clean the worktree or task branch in this Skill.
+
+## 8. Report the Execution
+
+Render the final report with the exact contract in [references/execution-report.md](references/execution-report.md). Report actual commands, evidence, review findings, fixes, and verification outcomes; never infer successful state from an attempted command.
+
+After a draft PR has been created and verified, include the worktree path and task branch, then remind the user:
+
+> PR 合并后，可以让我清理本地开发工作树和任务分支，以释放资源。
+
+Do not tell the user to invoke `auto-develop` for cleanup. A later ordinary cleanup request follows the user's existing cleanup workflow and approvals.
+
+Complete the Skill only when the verified draft PR and traceable report are delivered, or when the risk gate requires a pause that cannot be resolved autonomously. A valid pause may require user action, a material decision, or recovery of an exhausted external dependency.
+
+## Use the Risk Gate Sparingly
+
+Pause only for one of these conditions:
+
+- The user must supply or perform login, MFA, credentials, identity confirmation, authorization, or external approval.
+- Repository or environment rules require explicit user input, such as approving a named virtual-machine container before connection.
+- Ambiguity could cause major rework, material time or financial cost, team conflict, or a wrong business direction.
+- The next action creates irreversible data loss, production damage, or material security, legal, compliance, or financial exposure.
+- Safe alternatives have been exhausted and an external dependency still prevents completion.
+
+When pausing, preserve completed work and report verified facts, the exact blocker, the recommended choice, alternatives, and consequences. Do not pause for routine ambiguity, reversible decisions, ordinary failures, missing optional integrations, or work the agent can safely investigate.

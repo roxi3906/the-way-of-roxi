@@ -2,6 +2,7 @@ import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import YAML from "yaml";
 import { runProcessWithClosedStdin } from "./lib/run-process.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
@@ -34,6 +35,37 @@ const listFiles = async (directory, prefix = "") => {
   return files;
 };
 
+const parseFrontmatter = (contents, sourcePath) => {
+  const match = contents.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+  if (!match) throw new Error(`${sourcePath} must start with YAML frontmatter`);
+  return YAML.parse(match[1]);
+};
+
+const verifyAutoDevelopManualOnly = async (installed) => {
+  const skillPath = path.join(installed, "SKILL.md");
+  const openaiPath = path.join(installed, "agents", "openai.yaml");
+  const [skillContents, openaiContents] = await Promise.all([
+    readFile(skillPath, "utf8"),
+    readFile(openaiPath, "utf8"),
+  ]);
+  const metadata = parseFrontmatter(skillContents, skillPath);
+  const openai = YAML.parse(openaiContents);
+  const controls = {
+    openaiAllowImplicitInvocation: openai.policy?.allow_implicit_invocation,
+    opencodeAutoinvoke: metadata.metadata?.["opencode/autoinvoke"],
+    portableManualOnly: metadata.metadata?.["invocation/manual-only"],
+  };
+
+  if (
+    controls.openaiAllowImplicitInvocation !== false ||
+    controls.opencodeAutoinvoke !== "false" ||
+    controls.portableManualOnly !== "true"
+  ) {
+    throw new Error("installed auto-develop skill does not preserve every manual-only control");
+  }
+  return controls;
+};
+
 const verifyInstalledSkill = async (agent, skillName, installedRoot) => {
   const source = path.join(skillsRoot, skillName);
   const installed = path.join(installedRoot, skillName);
@@ -53,6 +85,10 @@ const verifyInstalledSkill = async (agent, skillName, installedRoot) => {
       throw new Error(`${agent}/${skillName}/${relativePath} differs from the canonical file`);
     }
   }
+
+  return skillName === "auto-develop"
+    ? verifyAutoDevelopManualOnly(installed)
+    : undefined;
 };
 
 const verifyAgent = async (agent, installRoot, skillNames, signal) => {
@@ -71,14 +107,17 @@ const verifyAgent = async (agent, installRoot, skillNames, signal) => {
 
     // 每个 Agent 独立安装，验证 CLI 实际使用的原生项目目录。
     const installedRoot = path.join(tempRoot, installRoot);
+    let autoDevelopManualOnly;
     for (const skillName of skillNames) {
-      await verifyInstalledSkill(agent, skillName, installedRoot);
+      const controls = await verifyInstalledSkill(agent, skillName, installedRoot);
+      if (controls) autoDevelopManualOnly = controls;
     }
 
     return {
       agent,
       skills: skillNames,
       installRoot,
+      autoDevelopManualOnly,
     };
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
@@ -118,13 +157,15 @@ export const verifyCombinedAgentInstallation = async () => {
 
     // `--copy` 保留多目标安装的原生目录；共享目录只需验证一次。
     const installRoots = [...new Set(targetAgents.map((agent) => agentInstallRoots[agent]))];
+    const autoDevelopManualOnlyByRoot = {};
     for (const installRoot of installRoots) {
       for (const skillName of skillNames) {
-        await verifyInstalledSkill("combined", skillName, path.join(tempRoot, installRoot));
+        const controls = await verifyInstalledSkill("combined", skillName, path.join(tempRoot, installRoot));
+        if (controls) autoDevelopManualOnlyByRoot[installRoot] = controls;
       }
     }
 
-    return { agents: targetAgents, installRoots, skills: skillNames };
+    return { agents: targetAgents, installRoots, skills: skillNames, autoDevelopManualOnlyByRoot };
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }

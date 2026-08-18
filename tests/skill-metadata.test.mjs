@@ -13,6 +13,87 @@ const skillsRoot = path.join(root, "skills");
 const contractPath = path.join(root, "tests", "fixtures", "skill-trigger-cases.json");
 const skillsCli = path.join(root, "node_modules", ".bin", "skills");
 
+const expectedAgentProfiles = {
+  amp: {
+    installRoot: ".agents/skills",
+    invocationTemplate: "/{skill}",
+    invocationForm: "slash",
+    manualOnlyControl: "runtime-gate",
+  },
+  codex: {
+    installRoot: ".agents/skills",
+    invocationTemplate: "$" + "{skill}",
+    invocationForm: "dollar",
+    manualOnlyControl: "openai-policy",
+  },
+  "claude-code": {
+    installRoot: ".claude/skills",
+    invocationTemplate: "/{skill}",
+    invocationForm: "slash",
+    manualOnlyControl: "runtime-gate",
+  },
+  cline: {
+    installRoot: ".agents/skills",
+    invocationTemplate: "Use the {skill} skill for this request.",
+    invocationForm: "direct-instruction",
+    manualOnlyControl: "runtime-gate",
+  },
+  cursor: {
+    installRoot: ".agents/skills",
+    invocationTemplate: "/{skill}",
+    invocationForm: "slash",
+    manualOnlyControl: "runtime-gate",
+  },
+  "gemini-cli": {
+    installRoot: ".agents/skills",
+    invocationTemplate: "Use the {skill} skill for this request.",
+    invocationForm: "direct-instruction",
+    manualOnlyControl: "runtime-gate",
+  },
+  "github-copilot": {
+    installRoot: ".agents/skills",
+    invocationTemplate: "/{skill}",
+    invocationForm: "slash",
+    manualOnlyControl: "runtime-gate",
+  },
+  goose: {
+    installRoot: ".goose/skills",
+    invocationTemplate: "/skills {skill}",
+    invocationForm: "skills-command",
+    manualOnlyControl: "runtime-gate",
+  },
+  "kiro-cli": {
+    installRoot: ".kiro/skills",
+    invocationTemplate: "/{skill}",
+    invocationForm: "slash",
+    manualOnlyControl: "runtime-gate",
+  },
+  opencode: {
+    installRoot: ".agents/skills",
+    invocationTemplate: "/{skill}",
+    invocationForm: "slash",
+    manualOnlyControl: "opencode-autoinvoke",
+  },
+  "qwen-code": {
+    installRoot: ".qwen/skills",
+    invocationTemplate: "/{skill}",
+    invocationForm: "slash",
+    manualOnlyControl: "runtime-gate",
+  },
+  roo: {
+    installRoot: ".roo/skills",
+    invocationTemplate: "Use the {skill} skill for this request.",
+    invocationForm: "direct-instruction",
+    manualOnlyControl: "runtime-gate",
+  },
+  windsurf: {
+    installRoot: ".windsurf/skills",
+    invocationTemplate: "Use the {skill} skill for this request.",
+    invocationForm: "direct-instruction",
+    manualOnlyControl: "runtime-gate",
+  },
+};
+
 const parseFrontmatter = (contents, sourcePath) => {
   const match = contents.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
   assert.ok(match, `${sourcePath} must start with YAML frontmatter`);
@@ -48,7 +129,10 @@ test("every canonical skill has valid portable metadata and a complete trigger c
     const openai = YAML.parse(await readFile(openaiPath, "utf8"));
     const contract = contracts.skills[name];
 
-    assert.deepEqual(Object.keys(metadata).sort(), ["description", "name"]);
+    const expectedMetadataKeys = name === "auto-develop"
+      ? ["description", "metadata", "name"]
+      : ["description", "name"];
+    assert.deepEqual(Object.keys(metadata).sort(), expectedMetadataKeys);
     assert.equal(metadata.name, name);
     assert.match(metadata.name, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
     assert.ok(metadata.description.length > 0 && metadata.description.length <= 1024);
@@ -82,7 +166,52 @@ test("every canonical skill has valid portable metadata and a complete trigger c
     assert.ok(openai.interface.default_prompt.includes(`$${name}`));
     assert.ok(openai.interface.short_description.length >= 25);
     assert.ok(openai.interface.short_description.length <= 64);
+
+    if (name === "auto-develop") {
+      assert.equal(metadata.metadata?.["invocation/manual-only"], "true");
+      assert.equal(metadata.metadata?.["opencode/autoinvoke"], "false");
+    }
   }
+});
+
+test("every supported agent has one canonical invocation profile", async () => {
+  const contracts = await readContracts();
+
+  assert.deepEqual(contracts.agentProfiles, expectedAgentProfiles);
+  assert.deepEqual(Object.keys(contracts.agentProfiles).sort(), [...contracts.targetAgents].sort());
+
+  for (const [agent, profile] of Object.entries(contracts.agentProfiles)) {
+    const expectedInvocation = profile.invocationTemplate.replace("{skill}", "auto-develop");
+    assert.equal(contracts.skills["auto-develop"].explicitInvocations[agent], expectedInvocation);
+  }
+});
+
+test("auto-develop covers every explicit invocation form without leaking one into negative prompts", async () => {
+  const contracts = await readContracts();
+  const contract = contracts.skills["auto-develop"];
+  const explicitExamples = [...contract.positivePrompts, ...contract.paraphrasePrompts]
+    .join("\n")
+    .toLowerCase();
+  const negativeExamples = contract.negativePrompts.join("\n").toLowerCase();
+  const formSignals = {
+    dollar: "$auto-develop",
+    slash: "/auto-develop",
+    "skills-command": "/skills auto-develop",
+    "direct-instruction": "use the auto-develop skill",
+  };
+
+  for (const form of new Set(Object.values(expectedAgentProfiles).map(({ invocationForm }) => invocationForm))) {
+    assert.ok(explicitExamples.includes(formSignals[form]), `auto-develop needs a ${form} example`);
+    assert.ok(!negativeExamples.includes(formSignals[form]), `negative prompts must exclude ${form}`);
+  }
+  assert.match(explicitExamples, /selected auto-develop/);
+});
+
+test("auto-develop preserves the repository workflow's comment policy", async () => {
+  const contents = await readFile(path.join(skillsRoot, "auto-develop", "SKILL.md"), "utf8");
+
+  assert.match(contents, /Follow the repository's established implementation and comment rules\./);
+  assert.doesNotMatch(contents, /Add comments only where the logic would otherwise be difficult to understand\./);
 });
 
 test("every canonical skill keeps invocation portable across host agents", async () => {
