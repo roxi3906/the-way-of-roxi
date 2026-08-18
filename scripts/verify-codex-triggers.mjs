@@ -34,8 +34,19 @@ const triggerCases = [
   {
     id: "auto-develop",
     evalName: "eval-auto-develop",
-    mode: "explicit",
-    prompt: "$eval-auto-develop Without running tools or changing files, describe the exact autonomous workflow for a small repository feature. Assume develop, dev/main, main, and master all exist; one configured tracking candidate is a unique 94% match; and deep review finds one actionable recommended fix. State the invocation's commit and push authorization, source priority, worktree, automatic binding, fix and re-review outcome, and the verified draft PR URL/state/base/head. Finish with a detailed decision tree containing evidence, options, choice, risk, reversibility, user involvement, and outcome, then the ordinary post-merge local-resource reminder. Do not ask the user to choose a workspace or validation scope, and do not route cleanup through auto-develop.",
+    mode: "stateful",
+    turns: [
+      {
+        behavior: "auto-develop-ledger-progress",
+        toolPolicy: "none",
+        prompt: "$eval-auto-develop Without running tools or changing files, simulate a small repository delivery through context discovery, source isolation, tracking, and requirements mapping. Assume develop, dev/main, main, and master all exist; develop is selected at commit 0123456789abcdef0123456789abcdef01234567; the task branch is custom/repository-topic in /tmp/feature-worktree; and one configured tracking candidate is a unique 94% match whose binding read-back succeeds. The task will continue in a later turn. Report the midpoint state and how its audit history survives that continuation, but do not finish the simulated delivery.",
+      },
+      {
+        behavior: "auto-develop",
+        toolPolicy: "none",
+        prompt: "Continue the same simulation. Assume the implementation satisfies every mapped criterion; npm test passes 23/23; deep review finds one actionable recommended fix that is applied, revalidated, and re-reviewed cleanly; and draft PR read-back verifies URL https://example.invalid/pull/42, state draft, base develop, and head custom/repository-topic. Complete the simulated autonomous delivery report according to the selected Skill. Do not ask for routine workspace or validation choices, and keep cleanup separate from this delivery.",
+      },
+    ],
   },
   {
     id: "auto-develop-create",
@@ -266,6 +277,7 @@ const AUTO_DEVELOP_STATUS_LABELS = new Set([
   "starting commit",
   "task branch",
   "worktree",
+  "decision ledger read-back",
   "tracking match",
   "tracking creation readiness",
   "tracking action",
@@ -338,6 +350,21 @@ const selectedBranch = (records) => {
     "iu",
   );
   return selectedBranchFailure.test(reason) ? undefined : branch;
+};
+
+// 成功报告必须证明私有 Markdown 账本已按追加模式读回并完成节点核对。
+const hasVerifiedDecisionLedger = (records) => {
+  const value = records.get("decision ledger read-back")?.value || "";
+  const fields = value.split(";").map((field) => field.trim().replace(/\.$/, ""));
+  if (fields.length !== 4) return false;
+  const [ledgerPath, format, updateMode, reconciliation] = fields;
+  return (
+    path.isAbsolute(ledgerPath) &&
+    /\.md$/i.test(ledgerPath) &&
+    /^format Markdown$/i.test(format) &&
+    /^append-only updates verified$/i.test(updateMode) &&
+    /^all reported nodes reconciled$/i.test(reconciliation)
+  );
 };
 
 const isValidGitBranchName = (value) => {
@@ -854,6 +881,21 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     ? parseAutoDevelopOutput(output)
     : undefined;
 
+  if (caseId === "auto-develop-ledger-progress") {
+    const durableLedgerSignals = [
+      /(?:decision|audit) ledger/i,
+      /private/i,
+      /\.md\b/i,
+      /append/i,
+      /read[- ]back/i,
+      /(?:resume|continuation|restore)/i,
+    ];
+    if (durableLedgerSignals.some((signal) => !signal.test(output))) {
+      throw new Error("auto-develop did not preserve a durable append-only ledger across the resumed turn");
+    }
+    return;
+  }
+
   if (caseId === "auto-develop") {
     const { decisionTreeIndex, lines, narrativeLines, statusRecords, tableHeaderIndex, tableLines } = autoDevelopReport;
     const authorizationLine = statusRecords.get("authorization")?.line;
@@ -898,6 +940,9 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     }
     if (!hasVerifiedWorktree(statusRecords) || hasWorktreeFailureEvidence(narrativeLines)) {
       throw new Error("auto-develop did not report a verified worktree in ready state");
+    }
+    if (!hasVerifiedDecisionLedger(statusRecords)) {
+      throw new Error("auto-develop did not read back a durable decision ledger");
     }
     if (AUTO_DEVELOP_PAUSE_LABELS.some((label) => statusRecords.has(label))) {
       throw new Error("auto-develop mixed successful and paused delivery states");
@@ -964,63 +1009,64 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
       {
         node: "Source branch",
         sequence: "D-01",
-        phase: /source branch/i,
         expectedOutcome: "Base recorded",
       },
       {
         node: "Worktree",
         sequence: "D-02",
-        phase: /worktree/i,
         expectedOutcome: "Worktree ready",
       },
       {
         node: "Tracking",
         sequence: "D-03",
-        phase: /tracking/i,
         expectedOutcome: "Read-back verified",
       },
       {
         node: "Requirements",
         sequence: "D-04",
-        phase: /requirements/i,
         expectedOutcome: "Criteria mapped",
       },
       {
         node: "Implementation",
         sequence: "D-05",
-        phase: /implementation/i,
         expectedOutcome: "Behavior implemented",
       },
       {
         node: "Verification",
         sequence: "D-06",
-        phase: /verification/i,
         expectedOutcome: "Passed",
       },
       {
         node: "Review fixes",
         sequence: "D-07",
-        phase: /review fixes/i,
         expectedOutcome: "Re-review clean",
       },
       {
         node: "Draft PR",
         sequence: "D-08",
-        phase: /draft pr/i,
         expectedOutcome: "URL and refs verified",
       },
     ];
-    if (treeLines.length !== decisionPhases.length + 1) {
+    if (treeLines.length < decisionPhases.length + 1) {
       throw new Error("auto-develop decision tree omitted or reordered a delivery phase");
     }
+    // 允许阶段内追加材料决策，但每个节点必须保持连接、唯一且能与明细表一一对应。
+    const decisionEntries = treeLines.slice(1).map((line, index, entries) => {
+      const match = line.match(/^(\|-|`-)\s+(D-\d+(?:\.\d+)*)\s+(.+)$/);
+      if (!match || (match[1] === "`-") !== (index === entries.length - 1)) {
+        throw new Error("auto-develop decision tree contains a malformed or disconnected decision");
+      }
+      return { connector: match[1], sequence: match[2], node: match[3] };
+    });
+    if (new Set(decisionEntries.map(({ sequence }) => sequence)).size !== decisionEntries.length) {
+      throw new Error("auto-develop decision tree contains a duplicate decision identifier");
+    }
     let phaseLineIndex = 0;
-    for (const [phaseIndex, { node, phase, sequence }] of decisionPhases.entries()) {
-      const nextLineIndex = treeLines.findIndex(
-        (line, index) => index > phaseLineIndex && phase.test(line),
-      );
-      if (nextLineIndex === -1) throw new Error("auto-develop decision tree omitted or reordered a delivery phase");
+    for (const [phaseIndex, { node, sequence }] of decisionPhases.entries()) {
       const connector = phaseIndex === decisionPhases.length - 1 ? String.fromCharCode(96) + "-" : "|-";
-      if (treeLines[nextLineIndex] !== connector + " " + sequence + " " + node) {
+      const requiredLine = connector + " " + sequence + " " + node;
+      const nextLineIndex = treeLines.indexOf(requiredLine);
+      if (nextLineIndex <= phaseLineIndex) {
         throw new Error("auto-develop decision tree omitted or reordered a delivery phase");
       }
       phaseLineIndex = nextLineIndex;
@@ -1042,6 +1088,9 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
       throw new Error("auto-develop did not preserve decision evidence and reversibility fields");
     }
     const detailRows = tableLines.slice(1).map(parseReportTableCells);
+    const populatedDetailRows = detailRows.filter(
+      (cells) => !cells.every((cell) => !cell || /^-+$/.test(cell)),
+    );
     const outcomeIndex = headerCells.findIndex((cell) => cell.toLowerCase() === "outcome");
     let previousDecisionRowIndex = -1;
     for (const { node, expectedOutcome } of decisionPhases) {
@@ -1063,6 +1112,21 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
       const outcome = row[outcomeIndex] || "";
       if (outcome.replace(/\.$/, "").trim() !== expectedOutcome) {
         throw new Error("auto-develop did not include a successful outcome for every delivery phase");
+      }
+    }
+    if (populatedDetailRows.length !== decisionEntries.length) {
+      throw new Error("auto-develop did not reconcile every ledger decision with the report table");
+    }
+    for (const { node } of decisionEntries) {
+      const matchingRows = populatedDetailRows.filter(
+        (cells) => (cells[0] || "").toLowerCase() === node.toLowerCase(),
+      );
+      if (
+        matchingRows.length !== 1 ||
+        matchingRows[0].length !== headerCells.length ||
+        matchingRows[0].some((cell) => !cell)
+      ) {
+        throw new Error("auto-develop did not include complete decision details for every ledger entry");
       }
     }
     const routineWorkspaceRequest = /(?:please\s+)?(?:choose|select)\s+(?:a\s+)?(?:workspace|worktree)(?:\s+strategy)?/i.test(output) || /请选择[^\n]*(?:工作区|工作树)/.test(output);

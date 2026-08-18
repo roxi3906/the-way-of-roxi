@@ -45,9 +45,13 @@ Treat the 90% tracking gate as one explicit exception: when it passes, invocatio
 
 ## Start the Execution Ledger
 
-Read [references/execution-report.md](references/execution-report.md) completely before planning. Start its decision ledger immediately and update it when each material choice is made. Record evidence at decision time; do not reconstruct the tree from memory at the end.
+Read [references/execution-report.md](references/execution-report.md) completely before planning. Before making the first material choice, create its Markdown decision ledger in the host's project-private planning directory. Use the private location required by an applicable repository workflow; otherwise use the host's private planning area outside the delivered diff. Never use conversation context as the only ledger copy.
 
-Keep the ledger in task context or the host's private planning area. Do not add it to the repository unless the user explicitly requests a tracked artifact.
+Immediately after every material decision, append one complete decision record to that file and read the appended record back. Never batch decisions for later entry, replace an earlier record, or reconstruct decisions from memory at the end. When a decision's result becomes known, append its outcome update instead of editing the original record.
+
+At the start of every later turn, resumed session, or context-restored continuation, read the ledger before deciding or acting. If the ledger is missing or cannot be read, recover it only from verified preserved evidence and append an explicit recovery record. Apply the risk gate when the required audit trail cannot be recovered without invention.
+
+Keep the ledger untracked unless the user explicitly requests a shared artifact. A phase is incomplete until its material decisions and verified outcome updates have been appended and read back.
 
 ## 1. Discover the Delivery Context
 
@@ -132,7 +136,9 @@ Do not merge the PR and do not clean the worktree or task branch in this Skill.
 
 ## 8. Report the Execution
 
-Render the final report with the exact contract in [references/execution-report.md](references/execution-report.md). Report actual commands, evidence, review findings, fixes, and verification outcomes; never infer successful state from an attempted command.
+Before writing any terminal response, re-read this Skill, [references/execution-report.md](references/execution-report.md), and the private ledger. Reconcile every ledger entry and outcome update with the final status records, connected tree, and decision-details table. The terminal response is invalid if the ledger read-back record, any material decision, any required phase, or any decision-detail field is missing.
+
+Render the final report with the exact contract in [references/execution-report.md](references/execution-report.md). Report the absolute private ledger path, actual commands, evidence, review findings, fixes, and verification outcomes; never infer successful state from an attempted command. A risk-gate pause must still render the ledger entries accumulated through the blocker.
 
 After a draft PR has been created and verified, include the worktree path and task branch, then remind the user:
 

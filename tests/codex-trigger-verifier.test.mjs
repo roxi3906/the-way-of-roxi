@@ -132,6 +132,33 @@ test("Codex trigger runs are isolated and can persist only for lifecycle verific
   );
 });
 
+test("Auto Develop midpoint evidence survives a resumed turn in a private append-only ledger", async () => {
+  const { assertTriggerBehavior } = await loadVerifier();
+  const checkpoint = [
+    "SKILL_ACTIVATED: eval-auto-develop",
+    "Decision ledger: /tmp/private/example.md",
+    "The private Markdown ledger uses append-only records with read-back verification.",
+    "The same ledger is read before the resumed continuation.",
+  ];
+
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "auto-develop-ledger-progress",
+      checkpoint.join("\n"),
+      "eval-auto-develop",
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "auto-develop-ledger-progress",
+        checkpoint.filter((line) => !/append-only/i.test(line)).join("\n"),
+        "eval-auto-develop",
+      ),
+    /durable append-only ledger/,
+  );
+});
+
 test("Codex trigger evidence distinguishes autonomous delivery, repository workflow, TAPD sync, and explicit summary behavior", async () => {
   const { assertAutoDevelopNotTriggered, assertSummaryNotTriggered, assertTriggerBehavior } = await loadVerifier();
 
@@ -146,6 +173,7 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
     "Starting commit: 0123456789abcdef0123456789abcdef01234567.",
     "Task branch: custom/repository-topic.",
     "Worktree: /tmp/feature-worktree; state ready.",
+    "Decision ledger read-back: /tmp/private/auto-develop-example-decision-ledger.md; format Markdown; append-only updates verified; all reported nodes reconciled.",
     "Tracking match: unique candidate at 94%.",
     "Tracking action: automatically bound.",
     "Tracking read-back: verified bound item TASK-42.",
@@ -193,6 +221,34 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
     assertTriggerBehavior(
       "auto-develop",
       completeAutoDevelopOutput.join("\n"),
+      "eval-auto-develop",
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "auto-develop",
+        completeAutoDevelopOutput
+          .filter((line) => !line.startsWith("Decision ledger read-back:"))
+          .join("\n"),
+        "eval-auto-develop",
+      ),
+    /durable decision ledger/,
+  );
+  const reportWithMaterialDecision = completeAutoDevelopOutput.flatMap((line) => {
+    if (line === "|- D-06 Verification") return ["|- D-05.1 Verification strategy", line];
+    if (line.startsWith("| Verification |")) {
+      return [
+        "| Verification strategy | Japanese labels overflow | Electron screenshot and measured widths | Expand buttons, truncate labels | Expand buttons | Preserve complete actions | Low | Revert CSS change | Not required | Labels fit |",
+        line,
+      ];
+    }
+    return [line];
+  });
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "auto-develop",
+      reportWithMaterialDecision.join("\n"),
       "eval-auto-develop",
     ),
   );
@@ -793,7 +849,7 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
           .join("\n"),
         "eval-auto-develop",
       ),
-    /omitted or reordered a delivery phase/,
+    /malformed or disconnected decision/,
   );
   assert.throws(
     () =>
@@ -804,7 +860,7 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
           .join("\n"),
         "eval-auto-develop",
       ),
-    /omitted or reordered a delivery phase/,
+    /malformed or disconnected decision/,
   );
   assert.throws(
     () =>
@@ -2529,8 +2585,17 @@ test("Codex trigger verification can select one case without weakening the defau
     selectTriggerCases("tapd-sync").map(({ id }) => id),
     ["tapd-sync"],
   );
-  assert.equal(selectTriggerCases("auto-develop")[0].evalName, "eval-auto-develop");
-  assert.match(selectTriggerCases("auto-develop")[0].prompt, /^\$eval-auto-develop\b/);
+  const autoDevelopCase = selectTriggerCases("auto-develop")[0];
+  assert.equal(autoDevelopCase.evalName, "eval-auto-develop");
+  assert.equal(autoDevelopCase.mode, "stateful");
+  assert.equal(autoDevelopCase.turns.length, 2);
+  assert.equal(autoDevelopCase.turns[0].behavior, "auto-develop-ledger-progress");
+  assert.equal(autoDevelopCase.turns[1].behavior, "auto-develop");
+  assert.match(autoDevelopCase.turns[0].prompt, /^\$eval-auto-develop\b/);
+  assert.doesNotMatch(
+    autoDevelopCase.turns.map(({ prompt }) => prompt).join("\n"),
+    /decision tree|reversibility|user involvement|post-merge local-resource reminder/i,
+  );
   assert.doesNotMatch(selectTriggerCases("auto-develop-negative")[0].prompt, /\$auto-develop/i);
   assert.equal(selectTriggerCases("auto-develop-create")[0].sourceSkillId, "auto-develop");
   assert.equal(selectTriggerCases("auto-develop-risk")[0].sourceSkillId, "auto-develop");
