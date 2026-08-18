@@ -16,6 +16,11 @@ const expectedSkills = readdirSync(path.join(root, "skills"), { withFileTypes: t
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
   .sort();
+const expectedAutoDevelopManualOnly = {
+  openaiAllowImplicitInvocation: false,
+  opencodeAutoinvoke: "false",
+  portableManualOnly: "true",
+};
 
 test("the repository installs every canonical skill into every target agent catalog", () => {
   const result = spawnSync(process.execPath, [verifier, "--json"], {
@@ -33,6 +38,7 @@ test("the repository installs every canonical skill into every target agent cata
   for (const report of reports) {
     assert.deepEqual(report.skills, expectedSkills);
     assert.equal(report.installRoot, expectedInstallRoots[report.agent]);
+    assert.deepEqual(report.autoDevelopManualOnly, expectedAutoDevelopManualOnly);
   }
 });
 
@@ -50,4 +56,12 @@ test("the combined quick install populates every documented agent catalog", () =
     [...new Set(Object.values(expectedInstallRoots))].sort(),
   );
   assert.deepEqual(report.skills, expectedSkills);
+  assert.deepEqual(
+    report.autoDevelopManualOnlyByRoot,
+    Object.fromEntries(
+      [...new Set(Object.values(expectedInstallRoots))]
+        .sort()
+        .map((installRoot) => [installRoot, expectedAutoDevelopManualOnly]),
+    ),
+  );
 });
