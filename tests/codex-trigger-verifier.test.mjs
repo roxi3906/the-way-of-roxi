@@ -64,7 +64,7 @@ test("Codex trigger runs remove TAPD configuration while preserving required run
 });
 
 test("Codex trigger runs are isolated and can persist only for lifecycle verification", async () => {
-  const { buildCodexArgs, buildCodexResumeArgs } = await loadVerifier();
+  const { buildCodexArgs, buildCodexResumeArgs, buildCodexTurnArgs } = await loadVerifier();
   const result = buildCodexArgs({
     workdir: "/tmp/fresh-repo",
     outputPath: "/tmp/fresh-repo/final.txt",
@@ -130,6 +130,44 @@ test("Codex trigger runs are isolated and can persist only for lifecycle verific
       "Continue the lifecycle check.",
     ],
   );
+
+  const lifecycleTurns = [
+    { prompt: "Start the active session." },
+    { prompt: "Resume the active session." },
+    { newSession: true, prompt: "Start a fresh session." },
+  ];
+  const commonTurnOptions = {
+    turns: lifecycleTurns,
+    workdir: "/tmp/fresh-repo",
+    toolHome: "/tmp/fresh-repo/home",
+    toolPath: "/usr/bin:/bin",
+  };
+  const firstTurn = buildCodexTurnArgs({
+    ...commonTurnOptions,
+    turnIndex: 0,
+    outputPath: "/tmp/fresh-repo/turn-1.txt",
+  });
+  const resumedTurn = buildCodexTurnArgs({
+    ...commonTurnOptions,
+    turnIndex: 1,
+    threadId: "active-thread",
+    outputPath: "/tmp/fresh-repo/turn-2.txt",
+  });
+  const freshTurn = buildCodexTurnArgs({
+    ...commonTurnOptions,
+    turnIndex: 2,
+    threadId: "active-thread",
+    outputPath: "/tmp/fresh-repo/turn-3.txt",
+  });
+
+  assert.equal(firstTurn.shouldCaptureThreadId, true);
+  assert.ok(!firstTurn.args.includes("--ephemeral"));
+  assert.equal(resumedTurn.shouldCaptureThreadId, false);
+  assert.deepEqual(resumedTurn.args.slice(0, 2), ["exec", "resume"]);
+  assert.ok(resumedTurn.args.includes("active-thread"));
+  assert.equal(freshTurn.shouldCaptureThreadId, false);
+  assert.ok(freshTurn.args.includes("--ephemeral"));
+  assert.ok(!freshTurn.args.includes("active-thread"));
 });
 
 test("Auto Develop midpoint evidence survives a resumed turn in a private append-only ledger", async () => {
@@ -156,6 +194,197 @@ test("Auto Develop midpoint evidence survives a resumed turn in a private append
         "eval-auto-develop",
       ),
     /durable append-only ledger/,
+  );
+});
+
+test("Auto Develop remains active for every later turn without broadening task scope", async () => {
+  const { assertTriggerBehavior } = await loadVerifier();
+  const activeSession = [
+    "SKILL_ACTIVATED: eval-auto-develop",
+    "Session mode: active until the current conversation ends.",
+    "Later messages continue to follow the selected workflow without another invocation.",
+    "Task scope: only the repository task requested by the current user message.",
+    "Delivery isolation: a new ledger and dedicated worktree are required; the earlier terminal delivery's worktree is not reused.",
+  ];
+
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "auto-develop-session-active",
+      activeSession.join("\n"),
+      "eval-auto-develop",
+    ),
+  );
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "auto-develop-session-active",
+      activeSession
+        .map((line) =>
+          /without another invocation/i.test(line)
+            ? "No repeat invocation is needed."
+            : line,
+        )
+        .join("\n"),
+      "eval-auto-develop",
+    ),
+  );
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "auto-develop-session-active",
+      activeSession
+        .concat(
+          "Session activation does not authorize unrelated repository work.",
+          "The mode does not deactivate after a risk-gate pause.",
+        )
+        .join("\n"),
+      "eval-auto-develop",
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "auto-develop-session-active",
+        activeSession.filter((line) => !/conversation ends/i.test(line)).join("\n"),
+        "eval-auto-develop",
+      ),
+    /session activation/i,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "auto-develop-session-active",
+        activeSession.concat("Please invoke the Skill again before continuing.").join("\n"),
+        "eval-auto-develop",
+      ),
+    /repeat invocation/i,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "auto-develop-session-active",
+        activeSession
+          .map((line) =>
+            /without another invocation/i.test(line)
+              ? "No repeat invocation is needed, but another invocation is required for each later message."
+              : line,
+          )
+          .join("\n"),
+        "eval-auto-develop",
+      ),
+    /repeat invocation/i,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "auto-develop-session-active",
+        activeSession
+          .map((line) =>
+            /without another invocation/i.test(line)
+              ? "Another invocation is required for each later message."
+              : line,
+          )
+          .join("\n"),
+        "eval-auto-develop",
+      ),
+    /repeat invocation/i,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "auto-develop-session-active",
+        activeSession.filter((line) => !/delivery isolation/i.test(line)).join("\n"),
+        "eval-auto-develop",
+      ),
+    /delivery isolation/i,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "auto-develop-session-active",
+        activeSession.concat("Session activation also authorizes unrelated repository work.").join("\n"),
+        "eval-auto-develop",
+      ),
+    /task scope/i,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "auto-develop-session-active",
+        activeSession.concat("The mode deactivates after any risk-gate pause.").join("\n"),
+        "eval-auto-develop",
+      ),
+    /session persistence/i,
+  );
+});
+
+test("Auto Develop keeps an ordinary follow-up active without inventing a delivery", async () => {
+  const { assertTriggerBehavior } = await loadVerifier();
+  const ordinaryReply = [
+    "SKILL_ACTIVATED: eval-auto-develop",
+    "The session remains active until this conversation ends.",
+    "No repository delivery starts for this ordinary question.",
+  ];
+
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "auto-develop-session-idle",
+      ordinaryReply.join("\n"),
+      "eval-auto-develop",
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "auto-develop-session-idle",
+        ordinaryReply.concat("Worktree: /tmp/unrequested; state ready.").join("\n"),
+        "eval-auto-develop",
+      ),
+    /invented a delivery/i,
+  );
+});
+
+test("Auto Develop survives a risk-gate pause and resumes the same delivery", async () => {
+  const { assertTriggerBehavior } = await loadVerifier();
+  const paused = [
+    "SKILL_ACTIVATED: eval-auto-develop",
+    "Risk gate status: paused.",
+    "The session remains active until this conversation ends.",
+    "Preserved delivery: ledger /tmp/current.md and worktree /tmp/current remain assigned.",
+  ];
+  const resumed = [
+    "SKILL_ACTIVATED: eval-auto-develop",
+    "The session remains active until this conversation ends.",
+    "No repeat invocation is needed.",
+    "Resume the same delivery using its existing ledger and worktree; do not start a new delivery.",
+  ];
+
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "auto-develop-session-paused",
+      paused.join("\n"),
+      "eval-auto-develop",
+    ),
+  );
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "auto-develop-session-resumed",
+      resumed.join("\n"),
+      "eval-auto-develop",
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "auto-develop-session-resumed",
+        resumed
+          .map((line) =>
+            /existing ledger/i.test(line)
+              ? "Start a new delivery using a new ledger and worktree."
+              : line,
+          )
+          .join("\n"),
+        "eval-auto-develop",
+      ),
+    /delivery continuity/i,
   );
 });
 
@@ -2588,10 +2817,28 @@ test("Codex trigger verification can select one case without weakening the defau
   const autoDevelopCase = selectTriggerCases("auto-develop")[0];
   assert.equal(autoDevelopCase.evalName, "eval-auto-develop");
   assert.equal(autoDevelopCase.mode, "stateful");
-  assert.equal(autoDevelopCase.turns.length, 2);
+  assert.equal(autoDevelopCase.turns.length, 7);
   assert.equal(autoDevelopCase.turns[0].behavior, "auto-develop-ledger-progress");
   assert.equal(autoDevelopCase.turns[1].behavior, "auto-develop");
+  assert.equal(autoDevelopCase.turns[2].behavior, "auto-develop-session-active");
+  assert.equal(autoDevelopCase.turns[3].behavior, "auto-develop-session-paused");
+  assert.equal(autoDevelopCase.turns[4].behavior, "auto-develop-session-resumed");
+  assert.equal(autoDevelopCase.turns[5].behavior, "auto-develop-session-idle");
+  assert.equal(autoDevelopCase.turns[6].negativeAssertion, "auto-develop");
+  assert.equal(autoDevelopCase.turns[6].newSession, true);
   assert.match(autoDevelopCase.turns[0].prompt, /^\$eval-auto-develop\b/);
+  assert.doesNotMatch(
+    autoDevelopCase.turns[2].prompt,
+    /auto-develop|skill|invoke|调用|技能/i,
+  );
+  assert.match(autoDevelopCase.turns[2].prompt, /separate[^.]+(?:ledger|worktree)/i);
+  assert.doesNotMatch(
+    autoDevelopCase.turns[5].prompt,
+    /auto-develop|skill|invoke|调用|技能/i,
+  );
+  assert.match(autoDevelopCase.turns[5].prompt, /ordinary question/i);
+  assert.match(autoDevelopCase.turns[6].prompt, /newly created conversation/i);
+  assert.doesNotMatch(autoDevelopCase.turns[6].prompt, /\$eval-auto-develop/i);
   assert.doesNotMatch(
     autoDevelopCase.turns.map(({ prompt }) => prompt).join("\n"),
     /decision tree|reversibility|user involvement|post-merge local-resource reminder/i,

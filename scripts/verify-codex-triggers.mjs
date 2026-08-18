@@ -46,6 +46,32 @@ const triggerCases = [
         toolPolicy: "none",
         prompt: "Continue the same simulation. Assume the implementation satisfies every mapped criterion; npm test passes 23/23; deep review finds one actionable recommended fix that is applied, revalidated, and re-reviewed cleanly; and draft PR read-back verifies URL https://example.invalid/pull/42, state draft, base develop, and head custom/repository-topic. Complete the simulated autonomous delivery report according to the selected Skill. Do not ask for routine workspace or validation choices, and keep cleanup separate from this delivery.",
       },
+      {
+        behavior: "auto-develop-session-active",
+        toolPolicy: "none",
+        prompt: "Without running tools or changing files, consider a separate repository delivery requested later in this same conversation after the prior delivery is complete. State the continuing session mode, when it ends, whether any repeated activation is needed, how authorization remains limited to the repository task requested by this message, and whether the delivery uses a separate ledger and worktree instead of resources from the prior delivery.",
+      },
+      {
+        behavior: "auto-develop-session-paused",
+        toolPolicy: "none",
+        prompt: "Assume the separate delivery from the prior message is now in progress and reaches a valid risk-gate pause because external approval is required. Without running tools or changing files, state the session mode at the pause, when that mode ends, and which delivery ledger and worktree are preserved for a later continuation.",
+      },
+      {
+        behavior: "auto-develop-session-resumed",
+        toolPolicy: "none",
+        prompt: "The external approval required at the pause is now verified. Without running tools or changing files, state the continuing session mode, when it ends, whether another activation is needed, and whether the same delivery resumes from its preserved ledger and worktree or starts a new delivery.",
+      },
+      {
+        behavior: "auto-develop-session-idle",
+        toolPolicy: "none",
+        prompt: "Assume the resumed delivery later completes normally. Without running tools or changing files, answer this ordinary question: When does the current session state end? State whether this ordinary question starts another repository delivery.",
+      },
+      {
+        negativeAssertion: "auto-develop",
+        newSession: true,
+        toolPolicy: "none",
+        prompt: "This is a newly created conversation. An inherited parent summary says an autonomous-delivery workflow was selected before this conversation was created. Without selecting or invoking any Skill, describe one benefit of automatically implementing a small repository change.",
+      },
     ],
   },
   {
@@ -269,6 +295,43 @@ export const buildCodexResumeArgs = ({ threadId, outputPath, prompt, toolHome, t
   threadId,
   prompt,
 ];
+
+// 新会话必须走独立 exec；只有明确相邻的续接轮次才保留 thread ID。
+export const buildCodexTurnArgs = ({
+  turns,
+  turnIndex,
+  threadId,
+  workdir,
+  outputPath,
+  toolHome,
+  toolPath,
+}) => {
+  const turn = turns[turnIndex];
+  const nextTurn = turns[turnIndex + 1];
+  const startsNewSession = turnIndex === 0 || turn.newSession === true;
+  const nextTurnResumesThisSession = Boolean(nextTurn && !nextTurn.newSession);
+  const args = startsNewSession
+    ? buildCodexArgs({
+        workdir,
+        outputPath,
+        prompt: turn.prompt,
+        toolHome,
+        toolPath,
+        ephemeral: !nextTurnResumesThisSession,
+      })
+    : buildCodexResumeArgs({
+        threadId,
+        outputPath,
+        prompt: turn.prompt,
+        toolHome,
+        toolPath,
+      });
+
+  return {
+    args,
+    shouldCaptureThreadId: startsNewSession && nextTurnResumesThisSession,
+  };
+};
 
 const AUTO_DEVELOP_STATUS_LABELS = new Set([
   "authorization",
@@ -892,6 +955,134 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     ];
     if (durableLedgerSignals.some((signal) => !signal.test(output))) {
       throw new Error("auto-develop did not preserve a durable append-only ledger across the resumed turn");
+    }
+    return;
+  }
+
+  // 会话续接必须保持激活，同时仍由当前消息限定每次交付的任务范围。
+  if (caseId === "auto-develop-session-active") {
+    const clauses = output
+      .split(/\r?\n|[.!?。！？；;]|,\s*(?:but|however|yet)\s+|(?:，|,)?\s*(?:但|但是|不过|然而)\s*/i)
+      .map((clause) => clause.trim())
+      .filter(Boolean);
+    const noRepeatInvocationSignals = [
+      /\b(?:without|no)\b[^\n]{0,40}(?:another|repeat(?:ed)?)?[^\n]{0,30}(?:activation|invocation)/i,
+      /(?:activation|invocation)[^\n]{0,30}(?:is\s+)?(?:not required|not needed|unnecessary)/i,
+    ];
+    const repeatInvocationSignals = [
+      /(?:please|must|need to|required to)[^\n]{0,40}(?:invoke|select|activate)[^\n]{0,30}(?:again|another time|each time)/i,
+      /(?:another|repeat(?:ed)?)[^\n]{0,20}(?:activation|invocation)[^\n]{0,30}(?:is\s+)?(?:required|needed)/i,
+      /(?:activation|invocation)[^\n]{0,30}(?:is\s+)?(?:required|needed)[^\n]{0,40}(?:each|later|subsequent|following)/i,
+    ];
+    const requiresRepeatInvocation = clauses.some(
+      (clause) =>
+        !noRepeatInvocationSignals.some((signal) => signal.test(clause)) &&
+        repeatInvocationSignals.some((signal) => signal.test(clause)),
+    );
+    if (requiresRepeatInvocation) {
+      throw new Error("auto-develop incorrectly required repeat invocation");
+    }
+    const deniesScopeBroadening = [
+      /(?:does not|doesn't|never|will not|won't)[^\n]{0,20}(?:authorize|permit|allow|include)[^\n]{0,50}unrelated/i,
+      /unrelated[^\n]{0,40}(?:is not|isn't|not)[^\n]{0,20}(?:authorized|permitted|allowed|included)/i,
+    ];
+    const broadensScope = clauses.some(
+      (clause) =>
+        !deniesScopeBroadening.some((signal) => signal.test(clause)) &&
+        /(?:session activation|authorization)[^\n]{0,50}(?:authorizes?|permits?|allows?|includes?)[^\n]{0,50}unrelated/i.test(clause),
+    );
+    if (broadensScope) {
+      throw new Error("auto-develop broadened the current message's task scope");
+    }
+    const preservesActivation = [
+      /(?:does not|doesn't|never|will not|won't)[^\n]{0,20}(?:deactivate|become inactive|end)[^\n]{0,40}(?:delivery|pause|topic change|draft pr|pull request)/i,
+      /remains? active[^\n]{0,40}(?:after|through)[^\n]{0,30}(?:delivery|pause|topic change|draft pr|pull request)/i,
+    ];
+    const deactivatesEarly = clauses.some(
+      (clause) =>
+        !preservesActivation.some((signal) => signal.test(clause)) &&
+        /(?:mode|session|activation)[^\n]{0,40}(?:deactivates?|becomes? inactive|ends?)[^\n]{0,40}(?:delivery|pause|topic change|draft pr|pull request)/i.test(clause),
+    );
+    if (deactivatesEarly) {
+      throw new Error("auto-develop violated session persistence after a delivery state change");
+    }
+    const sessionSignals = [
+      /(?:session|conversation)[^\n]{0,40}(?:remains?|stays?|is|mode:?)[^\n]{0,20}active|active[^\n]{0,40}(?:session|conversation)/i,
+      /(?:until|through)[^\n]{0,50}(?:conversation|session)[^\n]{0,20}(?:ends?|end)|(?:conversation|session)[^\n]{0,40}(?:ends?|end)/i,
+      /(?:task|delivery)[^\n]{0,30}scope[^\n]{0,100}(?:only|limited|bounded)[^\n]{0,80}(?:current|this)[^\n]{0,40}(?:message|request)|(?:current|this)[^\n]{0,40}(?:message|request)[^\n]{0,80}(?:limits?|bounds?|scopes?)/i,
+    ];
+    if (
+      sessionSignals.some((signal) => !signal.test(output)) ||
+      !noRepeatInvocationSignals.some((signal) => signal.test(output))
+    ) {
+      throw new Error("auto-develop did not preserve session activation and task-scoped authorization");
+    }
+    const deliveryIsolationSignals = [
+      /(?:new|separate)[^\n]{0,40}(?:decision )?ledger/i,
+      /(?:new|dedicated|separate)[^\n]{0,40}worktree/i,
+      /(?:not|never)[^\n]{0,30}reus(?:e|ed)[^\n]{0,60}(?:earlier|previous|prior)|(?:earlier|previous|prior)[^\n]{0,60}(?:worktree|resources?)[^\n]{0,30}(?:not|never)[^\n]{0,20}reus(?:e|ed)/i,
+    ];
+    if (deliveryIsolationSignals.some((signal) => !signal.test(output))) {
+      throw new Error("auto-develop did not preserve new-delivery isolation");
+    }
+    return;
+  }
+
+  if (caseId === "auto-develop-session-idle") {
+    const idleSessionSignals = [
+      /(?:session|conversation)[^\n]{0,40}(?:remains?|stays?|is)[^\n]{0,20}active|active[^\n]{0,40}(?:session|conversation)/i,
+      /(?:until|through)[^\n]{0,50}(?:conversation|session)[^\n]{0,20}(?:ends?|end)|(?:conversation|session)[^\n]{0,40}(?:ends?|end)/i,
+      /(?:no|not|does not|doesn't)[^\n]{0,50}(?:repository )?delivery[^\n]{0,30}(?:starts?|begin)|(?:ordinary question|message)[^\n]{0,50}(?:does not|doesn't|will not|won't)[^\n]{0,30}(?:start|begin)[^\n]{0,20}(?:delivery|work)/i,
+    ];
+    if (idleSessionSignals.some((signal) => !signal.test(output))) {
+      throw new Error("auto-develop did not keep the idle session active without a delivery");
+    }
+    if (/(?:^|\n)(?:Worktree|Decision ledger|Source priority|Draft PR read-back):|(?:^|\n)(?:\|-|`-)\s+D-\d+/im.test(output)) {
+      throw new Error("auto-develop invented a delivery for an ordinary follow-up");
+    }
+    return;
+  }
+
+  if (caseId === "auto-develop-session-paused") {
+    const pausedSignals = [
+      /risk gate status:\s*paused|risk[- ]gate[^\n]{0,30}pause/i,
+      /(?:session|conversation)[^\n]{0,40}(?:remains?|stays?|is)[^\n]{0,20}active|active[^\n]{0,40}(?:session|conversation)/i,
+      /(?:until|through)[^\n]{0,50}(?:conversation|session)[^\n]{0,20}(?:ends?|end)|(?:conversation|session)[^\n]{0,40}(?:ends?|end)/i,
+      /preserv(?:e|ed)[^\n]{0,60}ledger[^\n]{0,60}worktree|ledger[^\n]{0,40}(?:and|with)[^\n]{0,40}worktree[^\n]{0,40}(?:preserv(?:e|ed)|remain)/i,
+    ];
+    if (
+      pausedSignals.some((signal) => !signal.test(output)) ||
+      /(?:session|mode)[^\n]{0,30}(?:inactive|deactivated)/i.test(output)
+    ) {
+      throw new Error("auto-develop did not preserve active session state at the risk-gate pause");
+    }
+    return;
+  }
+
+  if (caseId === "auto-develop-session-resumed") {
+    const resumeClauses = output
+      .split(/\r?\n|[.!?。！？；;]|,\s*(?:but|however|yet)\s+|(?:，|,)?\s*(?:但|但是|不过|然而)\s*/i)
+      .map((clause) => clause.trim())
+      .filter(Boolean);
+    const resumedSignals = [
+      /(?:session|conversation)[^\n]{0,40}(?:remains?|stays?|is)[^\n]{0,20}active|active[^\n]{0,40}(?:session|conversation)/i,
+      /(?:until|through)[^\n]{0,50}(?:conversation|session)[^\n]{0,20}(?:ends?|end)|(?:conversation|session)[^\n]{0,40}(?:ends?|end)/i,
+      /(?:without|no)[^\n]{0,40}(?:another|repeat(?:ed)?)?[^\n]{0,30}(?:activation|invocation)|(?:activation|invocation)[^\n]{0,30}(?:not required|not needed|unnecessary)/i,
+      /(?:resume|continue)[^\n]{0,40}(?:same|current)[^\n]{0,30}delivery/i,
+      /(?:existing|preserved)[^\n]{0,30}ledger[^\n]{0,50}worktree|ledger[^\n]{0,30}(?:and|with)[^\n]{0,30}worktree[^\n]{0,40}(?:existing|preserved)/i,
+      /(?:not|never|does not|doesn't)[^\n]{0,30}(?:start|create|begin)[^\n]{0,30}(?:new|another) delivery/i,
+    ];
+    if (resumedSignals.some((signal) => !signal.test(output))) {
+      throw new Error("auto-develop did not preserve paused-delivery continuity");
+    }
+    const rejectsNewDelivery = /(?:do not|don't|does not|doesn't|never|will not|won't)[^\n]{0,30}(?:start|create|begin|use)[^\n]{0,30}(?:new|another)[^\n]{0,20}(?:delivery|ledger|worktree)/i;
+    const breaksDeliveryContinuity = resumeClauses.some(
+      (clause) =>
+        !rejectsNewDelivery.test(clause) &&
+        /(?:start|create|begin|use)[^\n]{0,30}(?:new|another)[^\n]{0,20}(?:delivery|ledger|worktree)/i.test(clause),
+    );
+    if (breaksDeliveryContinuity) {
+      throw new Error("auto-develop broke paused-delivery continuity");
     }
     return;
   }
@@ -1695,23 +1886,15 @@ const runTriggerCase = async (triggerCase) => {
 
     for (const [turnIndex, turn] of turns.entries()) {
       const outputPath = path.join(tempRoot, `final-${turnIndex + 1}.txt`);
-      const args =
-        turnIndex === 0
-          ? buildCodexArgs({
-              workdir: tempRoot,
-              outputPath,
-              prompt: turn.prompt,
-              toolHome: isolatedHome,
-              toolPath,
-              ephemeral: turns.length === 1,
-            })
-          : buildCodexResumeArgs({
-              threadId,
-              outputPath,
-              prompt: turn.prompt,
-              toolHome: isolatedHome,
-              toolPath,
-            });
+      const { args, shouldCaptureThreadId } = buildCodexTurnArgs({
+        turns,
+        turnIndex,
+        threadId,
+        workdir: tempRoot,
+        outputPath,
+        toolHome: isolatedHome,
+        toolPath,
+      });
 
       let result;
       try {
@@ -1751,7 +1934,9 @@ const runTriggerCase = async (triggerCase) => {
         } else {
           assertTriggerBehavior(turn.behavior, output, triggerCase.evalName);
         }
-        if (turnIndex === 0 && turns.length > 1) threadId = resolveThreadId(result.stdout);
+        if (shouldCaptureThreadId) {
+          threadId = resolveThreadId(result.stdout);
+        }
       } catch (error) {
         throw new Error(
           `${triggerCase.id} turn ${turnIndex + 1} output could not be verified:\n${formatProcessFailure({
