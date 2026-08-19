@@ -174,7 +174,10 @@ test("Auto Develop midpoint evidence survives a resumed turn in a private append
   const { assertTriggerBehavior } = await loadVerifier();
   const checkpoint = [
     "SKILL_ACTIVATED: eval-auto-develop",
-    "Decision ledger: /tmp/private/example.md",
+    "Decision ledger: /tmp/feature-worktree/.codex/plans/small-repository-delivery-decision-tree.md",
+    "Decision ledger header: session ID session-42; session name Small repository delivery; task summary Deliver a small repository change.",
+    "Decision ledger Git state: agent-private directory .codex/plans; ignored; untracked; excluded from commits.",
+    "Decision ledger schema: options; recommendation; selection.",
     "The private Markdown ledger uses append-only records with read-back verification.",
     "The same ledger is read before the resumed continuation.",
   ];
@@ -195,6 +198,39 @@ test("Auto Develop midpoint evidence survives a resumed turn in a private append
       ),
     /durable append-only ledger/,
   );
+});
+
+test("Auto Develop requires the decision ledger identity and Git isolation evidence", async () => {
+  const { assertTriggerBehavior } = await loadVerifier();
+  const checkpoint = [
+    "SKILL_ACTIVATED: eval-auto-develop",
+    "Decision ledger: /tmp/feature-worktree/.codex/plans/small-repository-delivery-decision-tree.md",
+    "Decision ledger header: session ID session-42; session name Small repository delivery; task summary Deliver a small repository change.",
+    "Decision ledger Git state: agent-private directory .codex/plans; ignored; untracked; excluded from commits.",
+    "Decision ledger schema: options; recommendation; selection.",
+    "The private Markdown ledger uses append-only records with read-back verification.",
+    "The same ledger is read before the resumed continuation.",
+  ];
+
+  for (const [mutation, expectedError] of [
+    [
+      (line) => line.replace("small-repository-delivery-decision-tree.md", "small-repository-delivery.md"),
+      /decision-tree file name/,
+    ],
+    [(line) => line.startsWith("Decision ledger header:") ? undefined : line, /session metadata/],
+    [(line) => line.startsWith("Decision ledger Git state:") ? undefined : line, /Git isolation/],
+    [(line) => line.startsWith("Decision ledger schema:") ? undefined : line, /decision options, recommendation, and selection/],
+  ]) {
+    assert.throws(
+      () =>
+        assertTriggerBehavior(
+          "auto-develop-ledger-progress",
+          checkpoint.map(mutation).filter(Boolean).join("\n"),
+          "eval-auto-develop",
+        ),
+      expectedError,
+    );
+  }
 });
 
 test("Auto Develop remains active for every later turn without broadening task scope", async () => {
@@ -402,7 +438,9 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
     "Starting commit: 0123456789abcdef0123456789abcdef01234567.",
     "Task branch: custom/repository-topic.",
     "Worktree: /tmp/feature-worktree; state ready.",
-    "Decision ledger read-back: /tmp/private/auto-develop-example-decision-ledger.md; format Markdown; append-only updates verified; all reported nodes reconciled.",
+    "Decision ledger read-back: /tmp/feature-worktree/.codex/plans/small-repository-delivery-decision-tree.md; format Markdown; append-only updates verified; all reported nodes reconciled.",
+    "Decision ledger header: session ID session-42; session name Small repository delivery; task summary Deliver a small repository change.",
+    "Decision ledger Git state: agent-private directory .codex/plans; ignored; untracked; excluded from commits.",
     "Tracking match: unique candidate at 94%.",
     "Tracking action: automatically bound.",
     "Tracking read-back: verified bound item TASK-42.",
@@ -428,15 +466,15 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
     "|- D-06 Verification",
     "|- D-07 Review fixes",
     "`- D-08 Draft PR",
-    "| Node | Trigger | Evidence | Options | Choice | Reason | Risk | Reversibility | User involvement | Outcome |",
-    "| Source branch | Start delivery | Branch refs | develop, dev/main, main, master | develop | First available | Low | Change base before edits | Invocation | Base recorded |",
-    "| Worktree | Isolate task | Worktree list | Create, reuse exact task worktree | Create | Preserve unrelated work | Low | Remove after merge | Invocation | Worktree ready |",
-    "| Tracking | Match task | Unique 94% candidate | Bind, create, unavailable | Bind | Same delivery goal | Low | Rebind before writes | Invocation | Read-back verified |",
-    "| Requirements | Define acceptance | User request and repository | Recommended implementation, alternatives | Recommended implementation | Best evidence | Low | Revise before commit | Not required | Criteria mapped |",
-    "| Implementation | Satisfy criteria | Failing baseline | Minimal change, broader refactor | Minimal change | Smallest coherent scope | Low | Revert task commit | Not required | Behavior implemented |",
-    "| Verification | Prove behavior | Test commands | Direct, expanded, substitute | Direct | Matches risk | Low | Add coverage | Not required | Passed |",
-    "| Review fixes | Resolve findings | Deep review | Apply, defer with risk gate | Apply | Actionable and in scope | Low | Revert fix | Not required | Re-review clean |",
-    "| Draft PR | Deliver change | PR read-back | Draft PR, risk-gate pause | Draft PR | Delivery complete | Low | Close PR | Invocation | URL and refs verified |",
+    "| Node | Trigger | Evidence | Options | Recommendation | Selection | Reason | Risk | Reversibility | User involvement | Outcome |",
+    "| Source branch | Start delivery | Branch refs | develop, dev/main, main, master | develop | develop | First available | Low | Change base before edits | Invocation | Base recorded |",
+    "| Worktree | Isolate task | Worktree list | Create, reuse exact task worktree | Create | Create | Preserve unrelated work | Low | Remove after merge | Invocation | Worktree ready |",
+    "| Tracking | Match task | Unique 94% candidate | Bind, create, unavailable | Bind | Bind | Same delivery goal | Low | Rebind before writes | Invocation | Read-back verified |",
+    "| Requirements | Define acceptance | User request and repository | Recommended implementation, alternatives | Recommended implementation | Recommended implementation | Best evidence | Low | Revise before commit | Not required | Criteria mapped |",
+    "| Implementation | Satisfy criteria | Failing baseline | Minimal change, broader refactor | Minimal change | Minimal change | Smallest coherent scope | Low | Revert task commit | Not required | Behavior implemented |",
+    "| Verification | Prove behavior | Test commands | Direct, expanded, substitute | Direct | Direct | Matches risk | Low | Add coverage | Not required | Passed |",
+    "| Review fixes | Resolve findings | Deep review | Apply, defer with risk gate | Apply | Apply | Actionable and in scope | Low | Revert fix | Not required | Re-review clean |",
+    "| Draft PR | Deliver change | PR read-back | Draft PR, risk-gate pause | Draft PR | Draft PR | Delivery complete | Low | Close PR | Invocation | URL and refs verified |",
     "Cleanup is outside this Skill and can be requested after merge.",
     "PR 合并后，可以让我清理本地开发工作树和任务分支，以释放资源。",
   ];
@@ -453,6 +491,19 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
       "eval-auto-develop",
     ),
   );
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "auto-develop",
+      completeAutoDevelopOutput
+        .map((line) =>
+          line.startsWith("Decision ledger Git state:")
+            ? "Decision ledger Git state: agent-private directory .codex/plans; ignored; force-added exact ledger; included by explicit user request."
+            : line,
+        )
+        .join("\n"),
+      "eval-auto-develop",
+    ),
+  );
   assert.throws(
     () =>
       assertTriggerBehavior(
@@ -464,11 +515,36 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
       ),
     /durable decision ledger/,
   );
+  for (const [linePrefix, expectedError] of [
+    ["Decision ledger header:", /session metadata/],
+    ["Decision ledger Git state:", /Git isolation/],
+  ]) {
+    assert.throws(
+      () =>
+        assertTriggerBehavior(
+          "auto-develop",
+          completeAutoDevelopOutput.filter((line) => !line.startsWith(linePrefix)).join("\n"),
+          "eval-auto-develop",
+        ),
+      expectedError,
+    );
+  }
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "auto-develop",
+        completeAutoDevelopOutput
+          .map((line) => line.startsWith("| Node |") ? line.replace(" Recommendation |", "") : line)
+          .join("\n"),
+        "eval-auto-develop",
+      ),
+    /recommendation and selection/,
+  );
   const reportWithMaterialDecision = completeAutoDevelopOutput.flatMap((line) => {
     if (line === "|- D-06 Verification") return ["|- D-05.1 Verification strategy", line];
     if (line.startsWith("| Verification |")) {
       return [
-        "| Verification strategy | Japanese labels overflow | Electron screenshot and measured widths | Expand buttons, truncate labels | Expand buttons | Preserve complete actions | Low | Revert CSS change | Not required | Labels fit |",
+        "| Verification strategy | Japanese labels overflow | Electron screenshot and measured widths | Expand buttons, truncate labels | Expand buttons | Expand buttons | Preserve complete actions | Low | Revert CSS change | Not required | Labels fit |",
         line,
       ];
     }
@@ -1583,7 +1659,7 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
         completeAutoDevelopOutput
           .map((line) =>
             line.startsWith("| Node |")
-              ? "| Node | Trigger | Options | Choice | Reason | Risk | User involvement | Outcome |"
+              ? "| Node | Trigger | Options | Recommendation | Selection | Reason | Risk | User involvement | Outcome |"
               : line,
           )
           .join("\n"),

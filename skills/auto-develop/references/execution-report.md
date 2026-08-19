@@ -11,7 +11,20 @@ Use this contract to keep autonomous delivery traceable without turning the repo
 
 ## Maintain the Decision Ledger
 
-Create an untracked Markdown file in the host's project-private planning directory before the first material decision. Initialize it with the user's goal and the absolute ledger path. Do not use conversation context as the only copy.
+Create the ledger before the first material decision at `<project-root>/<agent-private-plans>/<task-summary>-decision-tree.md`. Use the applicable tool-specific hidden directory, such as `.codex/plans/` or `.claude/plans/`; use `.ai/plans/` only when no tool-specific private directory exists. Normalize the short task summary into a filesystem-safe name without path separators. Keep the full path absolute.
+
+Before creating the file, prove that the directory is private to the agent and ignored by Git, and that the target path is not tracked. If the directory is not ignored, add its root-relative pattern to the repository-local exclude file returned by `git rev-parse --git-path info/exclude`, then repeat the checks. Do not edit a tracked ignore file for the ledger. After creation, read back Git evidence that the file remains ignored and untracked.
+
+Initialize the ledger with this header. Use exact host session metadata when exposed. When the host does not expose a session ID, record `not exposed by host` instead of inventing one; derive a concise session name from the current task only when no host name exists.
+
+```text
+# Decision Tree
+
+Session ID: <host session ID or not exposed by host>
+Session name: <host session name or concise derived name>
+Task summary: <short task summary>
+Decision ledger: <absolute path>
+```
 
 Immediately after each material decision, append this immutable record and read the appended content back:
 
@@ -21,7 +34,8 @@ Parent: <root or earlier decision>
 Trigger: <fact or event requiring a choice>
 Evidence: <repository, runtime, tool, test, or user evidence>
 Options: <credible alternatives considered>
-Choice: <selected option>
+Recommendation: <recommended option>
+Selection: <option actually selected>
 Reason: <why this option best satisfies the task>
 Risk: <low, medium, high and the concrete exposure>
 Reversibility: <how the choice can be undone, or irreversible>
@@ -39,7 +53,11 @@ Outcome: <verified final result>
 
 Record material choices about workflow precedence, source branch, worktree, tracking, requirements, implementation approach, validation, review fixes, and pull-request delivery. Omit trivial shell syntax and mechanically determined steps. Keep rejected alternatives when they explain why the chosen branch was safer or more correct. Use child identifiers such as `D-05.1` when a phase contains multiple material decisions.
 
-At the start of every later turn, resumed session, or context-restored continuation, read the ledger before deciding or acting. If it is missing, recover only from verified preserved evidence and append a recovery record; never silently reconstruct an audit trail from memory. Keep the file untracked unless the user explicitly requests a shared artifact.
+At the start of every later turn, resumed session, or context-restored continuation, read the ledger before deciding or acting. If it is missing, recover only from verified preserved evidence and append a recovery record; never silently reconstruct an audit trail from memory.
+
+Keep the ledger ignored, untracked, and outside every commit and pull-request diff by default. Before every commit, verify that its exact path is absent from the index. After commits and before push or draft-PR creation, verify that the path is absent from task history and the complete delivery diff. If it appears, remove only that path from Git delivery state while preserving the working file, then repeat the checks. Invocation alone never authorizes committing the ledger.
+
+An explicit user request for the current delivery may include the original ledger. In that case, force-add only the exact file, keep the directory ignore rule intact, and record the exception and user evidence in the ledger and terminal report.
 
 ## Use Unambiguous Status Records
 
@@ -55,6 +73,8 @@ Starting commit: <full verified commit hash>.
 Task branch: <verified Git-valid task branch>.
 Worktree: <absolute path>; state ready.
 Decision ledger read-back: <absolute private .md path>; format Markdown; append-only updates verified; all reported nodes reconciled.
+Decision ledger header: session ID <value>; session name <value>; task summary <value>.
+Decision ledger Git state: agent-private directory <root-relative hidden plans directory>; ignored; untracked; excluded from commits.
 Tracking match: unique candidate at <score>.
 Tracking creation readiness: <score, when creation is considered>
 Tracking action: <automatically bound | automatically created and bound | unavailable>
@@ -74,7 +94,7 @@ Resume condition: <observable condition>
 
 Use `Tracking match: none.` when no candidate qualifies. For a conflict, list every qualifying candidate's distinct identity and score as semicolon-delimited entries in the single `Tracking match` record, omit `Tracking action`, and report `Tracking write: none.`.
 
-After a successful bind or create-and-bind action, include `Tracking read-back` only after the destination item has been fetched and its bound state verified. A successful delivery must also include the worktree path with `state ready` and the verified decision-ledger read-back record; attempted, failed, pending, or placeholder states are not success evidence.
+After a successful bind or create-and-bind action, include `Tracking read-back` only after the destination item has been fetched and its bound state verified. A successful delivery must also include the worktree path with `state ready`, the decision-ledger header and absolute-path read-back records, and the verified default Git state. When the user explicitly requested the ledger in Git, replace the default Git-state suffix with `ignored; force-added exact ledger; included by explicit user request` and include the request evidence. Attempted, failed, pending, or placeholder states are not success evidence.
 
 Use exactly four semicolon-delimited fields for a successful draft PR record: `URL`, `state draft`, `base`, and `head`, in that order. The head must exactly equal the recorded task branch and differ from the base. Do not append another state or a conflicting qualification.
 
@@ -87,7 +107,7 @@ Use only the records that describe the actual path. For example, a tracking conf
 Use destination language rules and include these sections when applicable:
 
 1. **Outcome**: State whether every acceptance criterion passed or identify the exact blocker.
-2. **Delivery Context**: Show the source branch and full starting commit, task branch, worktree, and tracking or monitoring result.
+2. **Delivery Context**: Show the source branch and full starting commit, task branch, worktree, tracking or monitoring result, and the absolute decision-tree document path.
 3. **Implemented**: Describe observable behavior and affected business or content paths.
 4. **Verification**: List commands or checks with their final results. For every command, emit `Command: <actual command>` followed by `Result: <verified result>`. Distinguish direct, expanded, and substituted coverage.
 5. **Deep Review**: List findings by severity, the recommended fixes applied, re-review outcome, and any residual risk.
@@ -112,16 +132,16 @@ User goal
 Follow the tree with this decision-details table. Populate every cell for every decision; use `not applicable` only when the decision genuinely had no alternative or user-involvement state.
 
 ```text
-| Node | Trigger | Evidence | Options | Choice | Reason | Risk | Reversibility | User involvement | Outcome |
-| Source branch | ... | ... | ... | ... | ... | ... | ... | ... | ... |
-| Worktree | ... | ... | ... | ... | ... | ... | ... | ... | ... |
-| Tracking | ... | ... | ... | ... | ... | ... | ... | ... | ... |
-| Requirements | ... | ... | ... | ... | ... | ... | ... | ... | ... |
-| Implementation | ... | ... | ... | ... | ... | ... | ... | ... | ... |
-| Implementation approach | ... | ... | ... | ... | ... | ... | ... | ... | ... |
-| Verification | ... | ... | ... | ... | ... | ... | ... | ... | ... |
-| Review fixes | ... | ... | ... | ... | ... | ... | ... | ... | ... |
-| Draft PR | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+| Node | Trigger | Evidence | Options | Recommendation | Selection | Reason | Risk | Reversibility | User involvement | Outcome |
+| Source branch | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+| Worktree | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+| Tracking | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+| Requirements | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+| Implementation | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+| Implementation approach | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+| Verification | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+| Review fixes | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+| Draft PR | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
 ```
 
 Include one table row for every tree node, including child decisions, in the same order as the tree. For English reports, use these exact `Outcome` values for the eight required phase rows in phase order: `Base recorded`, `Worktree ready`, `Read-back verified`, `Criteria mapped`, `Behavior implemented`, `Passed`, `Re-review clean`, and `URL and refs verified`. Use the actual verified outcome for child decisions. Put details and the next decision in `Evidence` or explanatory prose. Translate these values consistently for a non-English destination. Keep failed attempts and recovered history in explanatory prose, not in the final outcome cell.
@@ -130,7 +150,9 @@ Do not invent branches or evidence that were not considered during execution.
 
 Before emitting the terminal response, re-read this contract and the ledger, then verify all of the following:
 
-- the decision-ledger read-back record contains its absolute private Markdown path;
+- the decision-ledger read-back record contains its absolute private Markdown path ending in `-decision-tree.md`;
+- the header records the session ID, session name, and task summary;
+- the Git-state record proves the default ignored, untracked, and commit-excluded state or the exact explicit-user exception;
 - every appended decision appears once in the tree and once in the table;
 - every table cell is populated and every outcome uses the latest verified update;
 - all eight delivery phases appear in order for a successful delivery;

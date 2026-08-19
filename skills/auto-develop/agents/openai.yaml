@@ -1,6 +1,6 @@
 interface:
   display_name: "Auto Develop"
   short_description: "Run explicit session-long delivery with traceable decisions"
-  default_prompt: "Use $auto-develop to keep autonomous delivery active for this session through reviewed draft PRs, persist each decision in a private Markdown ledger, and report every decision tree."
+  default_prompt: "Use $auto-develop to keep autonomous delivery active for this session through reviewed draft PRs, persist each decision in a Git-ignored private {task-summary}-decision-tree.md, and report its absolute path with the complete decision tree."
 policy:
   allow_implicit_invocation: false

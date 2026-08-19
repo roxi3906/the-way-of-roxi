@@ -49,13 +49,15 @@ Treat the 90% tracking gate as one explicit exception: when it passes, invocatio
 
 ## Start the Execution Ledger
 
-Read [references/execution-report.md](references/execution-report.md) completely before planning. Before making the first material choice for each requested delivery, create its Markdown decision ledger in the host's project-private planning directory. Use the private location required by an applicable repository workflow; otherwise use the host's private planning area outside the delivered diff. Never use conversation context as the only ledger copy. Reuse the ledger across later messages for the same delivery; start a new ledger when a later message begins a distinct delivery after the previous one reaches a terminal state.
+Read [references/execution-report.md](references/execution-report.md) completely before planning. Before making the first material choice for each requested delivery, create the decision ledger exactly as that contract defines it: `{task-summary}-decision-tree.md` in a Git-ignored, agent-owned private planning directory under the project root. Prefer the tool-specific directory required by an applicable workflow, such as `.codex/plans/` or `.claude/plans/`; use `.ai/plans/` only when no tool-specific private directory exists. Initialize its header with the session ID, session name, task summary, and absolute ledger path. Never use conversation context as the only ledger copy.
+
+Before creating the ledger, verify that Git ignores the selected private directory and does not track the target path. When the directory lacks an ignore rule, add only that root-relative private-directory pattern to the repository-local exclude file resolved by Git, then verify again; do not change a tracked ignore file for this runtime artifact. Keep the ledger ignored, untracked, and excluded from every commit and pull-request diff by default. Invocation does not authorize committing it. Only an explicit user request for the current delivery may include the exact ledger file; force-add only that file without weakening the directory ignore rule.
 
 Immediately after every material decision, append one complete decision record to that file and read the appended record back. Never batch decisions for later entry, replace an earlier record, or reconstruct decisions from memory at the end. When a decision's result becomes known, append its outcome update instead of editing the original record.
 
 At the start of every later turn, resumed session, or context-restored continuation with an in-progress or paused delivery, read that delivery's ledger before deciding or acting. If the ledger is missing or cannot be read, recover it only from verified preserved evidence and append an explicit recovery record. Apply the risk gate when the required audit trail cannot be recovered without invention. When the session is active but no delivery is current, do not read or recover an earlier delivery's ledger; first determine whether the new message starts another delivery.
 
-Keep the ledger untracked unless the user explicitly requests a shared artifact. A phase is incomplete until its material decisions and verified outcome updates have been appended and read back.
+Reuse the ledger across later messages for the same delivery; start a new ledger when a later message begins a distinct delivery after the previous one reaches a terminal state. A phase is incomplete until its material decisions and verified outcome updates have been appended and read back.
 
 ## 1. Discover the Delivery Context
 
@@ -132,7 +134,7 @@ Apply the risk gate to a recommendation only when fixing it requires a major sco
 
 ## 7. Commit, Push, and Open the Draft PR
 
-Inspect the final diff and exclude unrelated files or hunks. Follow repository commit conventions, commit the verified task changes, and push the task branch. Treat invocation as the exact pull-request authorization required by stricter workflows.
+Inspect the final diff and exclude unrelated files or hunks. Unless the user explicitly requested the ledger as a shared artifact, verify before every commit that its exact path is absent from the index, and verify before push and draft-PR creation that it is absent from every task commit and the complete pull-request diff. Remove only the ledger from Git delivery state if a check fails, preserving the private working file. Follow repository commit conventions, commit the verified task changes, and push the task branch. Treat invocation as the exact pull-request authorization required by stricter workflows.
 
 Read the repository PR template and recent comparable pull requests. Create a draft PR with the recorded source branch as the base and the task branch as the head. Never replace the recorded source with a generic default at this stage. Read the PR back and verify its URL, draft state, base, and head before reporting success.
 
@@ -142,7 +144,7 @@ Do not merge the PR and do not clean the worktree or task branch in this Skill.
 
 Before writing a terminal response for a delivery or risk-gate pause, re-read this Skill, [references/execution-report.md](references/execution-report.md), and that delivery's private ledger. Reconcile every ledger entry and outcome update with the final status records, connected tree, and decision-details table. The delivery response is invalid if the ledger read-back record, any material decision, any required phase, or any decision-detail field is missing. A message that does not start or continue a delivery receives an ordinary response under the active session rules without reading an earlier ledger or rendering an execution report.
 
-Render the final report with the exact contract in [references/execution-report.md](references/execution-report.md). Report the absolute private ledger path, actual commands, evidence, review findings, fixes, and verification outcomes; never infer successful state from an attempted command. A risk-gate pause must still render the ledger entries accumulated through the blocker.
+Render the final report with the exact contract in [references/execution-report.md](references/execution-report.md). Attach the absolute private decision-tree document path in every terminal delivery response, then report the actual commands, evidence, review findings, fixes, and verification outcomes; never infer successful state from an attempted command. A risk-gate pause must still render the ledger path and entries accumulated through the blocker.
 
 After a draft PR has been created and verified, include the worktree path and task branch, then remind the user:
 
