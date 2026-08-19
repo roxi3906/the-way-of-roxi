@@ -466,15 +466,15 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
     "|- D-06 Verification",
     "|- D-07 Review fixes",
     "`- D-08 Draft PR",
-    "| Node | Trigger | Evidence | Options | Recommendation | Selection | Reason | Risk | Reversibility | User involvement | Outcome |",
-    "| Source branch | Start delivery | Branch refs | develop, dev/main, main, master | develop | develop | First available | Low | Change base before edits | Invocation | Base recorded |",
-    "| Worktree | Isolate task | Worktree list | Create, reuse exact task worktree | Create | Create | Preserve unrelated work | Low | Remove after merge | Invocation | Worktree ready |",
-    "| Tracking | Match task | Unique 94% candidate | Bind, create, unavailable | Bind | Bind | Same delivery goal | Low | Rebind before writes | Invocation | Read-back verified |",
-    "| Requirements | Define acceptance | User request and repository | Recommended implementation, alternatives | Recommended implementation | Recommended implementation | Best evidence | Low | Revise before commit | Not required | Criteria mapped |",
-    "| Implementation | Satisfy criteria | Failing baseline | Minimal change, broader refactor | Minimal change | Minimal change | Smallest coherent scope | Low | Revert task commit | Not required | Behavior implemented |",
-    "| Verification | Prove behavior | Test commands | Direct, expanded, substitute | Direct | Direct | Matches risk | Low | Add coverage | Not required | Passed |",
-    "| Review fixes | Resolve findings | Deep review | Apply, defer with risk gate | Apply | Apply | Actionable and in scope | Low | Revert fix | Not required | Re-review clean |",
-    "| Draft PR | Deliver change | PR read-back | Draft PR, risk-gate pause | Draft PR | Draft PR | Delivery complete | Low | Close PR | Invocation | URL and refs verified |",
+    "| Node | Created at | Trigger | Evidence | Options | Recommendation | Selection | Reason | Risk | Reversibility | User involvement | Outcome |",
+    "| Source branch | 2026-08-19T09:00:00+08:00 | Start delivery | Branch refs | 1. develop - Use the first available source branch [Recommended]<br>2. dev/main - Use the secondary integration branch<br>3. main - Use the repository default branch<br>4. master - Use the legacy default branch | Option 1 - develop | Option 1 - develop | First available | Low | Change base before edits | Invocation | Base recorded |",
+    "| Worktree | 2026-08-19T09:01:00+08:00 | Isolate task | Worktree list | 1. Create - Create an isolated task worktree [Recommended]<br>2. Reuse exact task worktree - Continue in an existing matching worktree | Option 1 - Create | Option 1 - Create | Preserve unrelated work | Low | Remove after merge | Invocation | Worktree ready |",
+    "| Tracking | 2026-08-19T09:02:00+08:00 | Match task | Unique 94% candidate | 1. Bind - Reuse the unique matching item [Recommended]<br>2. Create - Create a verified parent item<br>3. Unavailable - Continue without tracking | Option 1 - Bind | Option 1 - Bind | Same delivery goal | Low | Rebind before writes | Invocation | Read-back verified |",
+    "| Requirements | 2026-08-19T09:03:00+08:00 | Define acceptance | User request and repository | 1. Recommended implementation - Follow the strongest repository evidence [Recommended]<br>2. Alternative implementation - Use the lower-confidence fallback | Option 1 - Recommended implementation | Option 1 - Recommended implementation | Best evidence | Low | Revise before commit | Not required | Criteria mapped |",
+    "| Implementation | 2026-08-19T09:04:00+08:00 | Satisfy criteria | Failing baseline | 1. Minimal change - Limit edits to the accepted behavior [Recommended]<br>2. Broader refactor - Restructure adjacent implementation | Option 1 - Minimal change | Option 1 - Minimal change | Smallest coherent scope | Low | Revert task commit | Not required | Behavior implemented |",
+    "| Verification | 2026-08-19T09:05:00+08:00 | Prove behavior | Test commands | 1. Direct - Test the changed behavior [Recommended]<br>2. Expanded - Include downstream behavior<br>3. Substitute - Use the closest available integration check | Option 1 - Direct | Option 1 - Direct | Matches risk | Low | Add coverage | Not required | Passed |",
+    "| Review fixes | 2026-08-19T09:06:00+08:00 | Resolve findings | Deep review | 1. Apply - Fix every in-scope finding [Recommended]<br>2. Defer with risk gate - Pause for a material scope decision | Option 1 - Apply | Option 1 - Apply | Actionable and in scope | Low | Revert fix | Not required | Re-review clean |",
+    "| Draft PR | 2026-08-19T09:07:00+08:00 | Deliver change | PR read-back | 1. Draft PR - Deliver a reviewable pull request [Recommended]<br>2. Risk-gate pause - Preserve work until the blocker resolves | Option 1 - Draft PR | Option 1 - Draft PR | Delivery complete | Low | Close PR | Invocation | URL and refs verified |",
     "Cleanup is outside this Skill and can be requested after merge.",
     "PR 合并后，可以让我清理本地开发工作树和任务分支，以释放资源。",
   ];
@@ -540,11 +540,90 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
       ),
     /recommendation and selection/,
   );
+  for (const [description, mutateReport, expectedError] of [
+    [
+      "missing creation-time column",
+      (line) => line.startsWith("| Node |")
+        ? line.replace(" Created at |", "")
+        : line.replace(/\| 2026-08-19T\d{2}:\d{2}:\d{2}\+08:00 \|/, "|"),
+      /decision creation time/,
+    ],
+    [
+      "invalid creation time",
+      (line) => line.startsWith("| Source branch |") ? line.replace("2026-08-19T09:00:00+08:00", "2026-08-19 09:00") : line,
+      /invalid creation time/,
+    ],
+    [
+      "creation time without an explicit runtime offset",
+      (line) => line.startsWith("| Source branch |") ? line.replace("2026-08-19T09:00:00+08:00", "2026-08-19T01:00:00Z") : line,
+      /invalid creation time/,
+    ],
+    [
+      "unnumbered option",
+      (line) => line.startsWith("| Source branch |") ? line.replace("2. dev/main", "dev/main") : line,
+      /consecutively numbered/,
+    ],
+    [
+      "option without an explanation",
+      (line) => line.startsWith("| Source branch |")
+        ? line.replace("2. dev/main - Use the secondary integration branch", "2. dev/main")
+        : line,
+      /meaningful explanation/,
+    ],
+    [
+      "option with a placeholder explanation",
+      (line) => line.startsWith("| Source branch |")
+        ? line.replace("2. dev/main - Use the secondary integration branch", "2. dev/main - TBD")
+        : line,
+      /meaningful explanation/,
+    ],
+    [
+      "missing recommendation marker",
+      (line) => line.startsWith("| Source branch |") ? line.replace(" [Recommended]", "") : line,
+      /exactly one recommended option/,
+    ],
+    [
+      "duplicate recommendation marker",
+      (line) => line.startsWith("| Source branch |")
+        ? line.replace(
+          "2. dev/main - Use the secondary integration branch",
+          "2. dev/main - Use the secondary integration branch [Recommended]",
+        )
+        : line,
+      /exactly one recommended option/,
+    ],
+    [
+      "recommendation points to an unmarked option",
+      (line) => line.startsWith("| Source branch |") ? line.replace("Option 1 - develop | Option 1 - develop", "Option 2 - dev/main | Option 1 - develop") : line,
+      /marked recommended option/,
+    ],
+    [
+      "selection points to a missing option",
+      (line) => line.startsWith("| Source branch |") ? line.replace("Option 1 - develop | First available", "Option 5 - missing | First available") : line,
+      /numbered selected option/,
+    ],
+    [
+      "selection label disagrees with its option",
+      (line) => line.startsWith("| Source branch |") ? line.replace("Option 1 - develop | First available", "Option 1 - main | First available") : line,
+      /numbered selected option/,
+    ],
+  ]) {
+    assert.throws(
+      () =>
+        assertTriggerBehavior(
+          "auto-develop",
+          completeAutoDevelopOutput.map(mutateReport).join("\n"),
+          "eval-auto-develop",
+        ),
+      expectedError,
+      description,
+    );
+  }
   const reportWithMaterialDecision = completeAutoDevelopOutput.flatMap((line) => {
     if (line === "|- D-06 Verification") return ["|- D-05.1 Verification strategy", line];
     if (line.startsWith("| Verification |")) {
       return [
-        "| Verification strategy | Japanese labels overflow | Electron screenshot and measured widths | Expand buttons, truncate labels | Expand buttons | Expand buttons | Preserve complete actions | Low | Revert CSS change | Not required | Labels fit |",
+        "| Verification strategy | 2026-08-19T09:04:30+08:00 | Japanese labels overflow | Electron screenshot and measured widths | 1. Expand buttons - Preserve complete action labels [Recommended]<br>2. Truncate labels - Keep the existing control width | Option 1 - Expand buttons | Option 1 - Expand buttons | Preserve complete actions | Low | Revert CSS change | Not required | Labels fit |",
         line,
       ];
     }
@@ -1659,7 +1738,7 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
         completeAutoDevelopOutput
           .map((line) =>
             line.startsWith("| Node |")
-              ? "| Node | Trigger | Options | Recommendation | Selection | Reason | Risk | User involvement | Outcome |"
+              ? "| Node | Created at | Trigger | Options | Recommendation | Selection | Reason | Risk | User involvement | Outcome |"
               : line,
           )
           .join("\n"),

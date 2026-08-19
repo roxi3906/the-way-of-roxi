@@ -807,6 +807,36 @@ const parseReportTableCells = (line) => {
   return cells;
 };
 
+const RFC3339_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?[+-]\d{2}:\d{2}$/;
+
+const parseNumberedDecisionOptions = (value) => {
+  const lines = value.split(/<br\s*\/?>/i).map((line) => line.trim()).filter(Boolean);
+  const options = [];
+
+  for (const [index, line] of lines.entries()) {
+    const match = line.match(/^(\d+)\.\s+(.+)$/);
+    if (!match || Number(match[1]) !== index + 1) return { error: "numbering" };
+
+    const recommendationMarker = /\s+\[(?:recommended|推荐)\]\s*$/i;
+    const recommended = recommendationMarker.test(match[2]);
+    const optionWithExplanation = match[2].replace(recommendationMarker, "").trim();
+    const explanationSeparator = optionWithExplanation.indexOf(" - ");
+    if (explanationSeparator <= 0) return { error: "explanation" };
+
+    const label = optionWithExplanation.slice(0, explanationSeparator).trim();
+    const explanation = optionWithExplanation.slice(explanationSeparator + 3).trim();
+    if (!label || !isMeaningfulStatusValue(explanation)) return { error: "explanation" };
+    options.push({ explanation, label, number: index + 1, recommended });
+  }
+
+  return lines.length > 0 ? { options } : { error: "numbering" };
+};
+
+const parseDecisionOptionReference = (value) => {
+  const match = value.match(/^(?:option|选项)\s+(\d+)\s+-\s+(.+)$/i);
+  return match ? { label: match[2].trim(), number: Number(match[1]) } : undefined;
+};
+
 const evidenceEntityPrefix = (node) => {
   if (/^source branch$/i.test(node)) return "Source branch";
   if (/^worktree$/i.test(node)) return "Worktree";
@@ -1324,11 +1354,15 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     }
     const headerCells = tableLines.length > 0 ? parseReportTableCells(tableLines[0]) : [];
     const normalizedHeaderCells = headerCells.map((cell) => cell.toLowerCase());
+    if (!normalizedHeaderCells.includes("created at")) {
+      throw new Error("auto-develop did not preserve decision creation time");
+    }
     if (!["recommendation", "selection"].every((header) => normalizedHeaderCells.includes(header))) {
       throw new Error("auto-develop did not preserve decision recommendation and selection fields");
     }
     const requiredHeaders = [
       "node",
+      "created at",
       "trigger",
       "evidence",
       "options",
@@ -1347,7 +1381,50 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     const populatedDetailRows = detailRows.filter(
       (cells) => !cells.every((cell) => !cell || /^-+$/.test(cell)),
     );
+    const createdAtIndex = normalizedHeaderCells.indexOf("created at");
+    const optionsIndex = normalizedHeaderCells.indexOf("options");
+    const recommendationIndex = normalizedHeaderCells.indexOf("recommendation");
+    const selectionIndex = normalizedHeaderCells.indexOf("selection");
     const outcomeIndex = headerCells.findIndex((cell) => cell.toLowerCase() === "outcome");
+
+    // 每行都必须保留决策时点和可回溯到同一候选项的推荐、选择。
+    for (const row of populatedDetailRows) {
+      const createdAt = row[createdAtIndex] || "";
+      if (!RFC3339_TIMESTAMP.test(createdAt) || Number.isNaN(Date.parse(createdAt))) {
+        throw new Error("auto-develop decision contains an invalid creation time");
+      }
+
+      const parsedOptions = parseNumberedDecisionOptions(row[optionsIndex] || "");
+      if (parsedOptions.error === "numbering") {
+        throw new Error("auto-develop decision options were not consecutively numbered");
+      }
+      if (parsedOptions.error === "explanation") {
+        throw new Error("auto-develop decision options did not include a meaningful explanation");
+      }
+      const recommendedOptions = parsedOptions.options.filter(({ recommended }) => recommended);
+      if (recommendedOptions.length !== 1) {
+        throw new Error("auto-develop decision options did not mark exactly one recommended option");
+      }
+
+      const recommendation = parseDecisionOptionReference(row[recommendationIndex] || "");
+      const markedOption = recommendedOptions[0];
+      if (
+        !recommendation ||
+        recommendation.number !== markedOption.number ||
+        recommendation.label !== markedOption.label
+      ) {
+        throw new Error("auto-develop decision recommendation did not identify the marked recommended option");
+      }
+
+      const selection = parseDecisionOptionReference(row[selectionIndex] || "");
+      const selectedOption = selection && parsedOptions.options.find(
+        ({ number }) => number === selection.number,
+      );
+      if (!selectedOption || selection.label !== selectedOption.label) {
+        throw new Error("auto-develop decision selection did not identify a numbered selected option");
+      }
+    }
+
     let previousDecisionRowIndex = -1;
     for (const { node, expectedOutcome } of decisionPhases) {
       const matchingRowIndices = detailRows

@@ -30,18 +30,25 @@ Immediately after each material decision, append this immutable record and read 
 
 ```text
 D-<sequence> <decision title>
+Created at: <RFC 3339 timestamp in the runtime timezone, including the UTC offset>
 Parent: <root or earlier decision>
 Trigger: <fact or event requiring a choice>
 Evidence: <repository, runtime, tool, test, or user evidence>
-Options: <credible alternatives considered>
-Recommendation: <recommended option>
-Selection: <option actually selected>
+Options:
+1. <credible option label> - <what choosing it means, its benefit, or its main tradeoff> [Recommended]
+2. <credible option label> - <what choosing it means, its benefit, or its main tradeoff>
+Recommendation: Option 1 - <exact recommended option label>
+Selection: Option 1 - <exact selected option label>
 Reason: <why this option best satisfies the task>
 Risk: <low, medium, high and the concrete exposure>
 Reversibility: <how the choice can be undone, or irreversible>
 User involvement: <not required, authorized by invocation, or explicitly required>
 Outcome: pending verification
 ```
+
+Capture `Created at` immediately before appending the decision. Use seconds and an explicit numeric UTC offset, for example `2026-08-19T09:15:30+08:00`; keep that creation time unchanged in later outcome updates.
+
+List every credible option on its own line, starting at `1.` and increasing without gaps. After the stable option label, use ` - ` and a meaningful explanation of what choosing it means, its benefit, or its main tradeoff. Reject empty explanations and placeholders such as `TBD`, `N/A`, `unknown`, or their translated equivalents. Mark exactly one option with `[Recommended]` (or `[推荐]` in a Chinese record). Both `Recommendation` and `Selection` must identify an option by number and repeat its exact label, without repeating the explanation, using `Option N - <label>` or the consistently translated `选项 N - <label>` form. `Selection` records the option actually chosen, including when it differs from the recommendation.
 
 Never edit, replace, or reorder an earlier record. When the result becomes known, append an outcome update and read it back:
 
@@ -129,22 +136,22 @@ User goal
 `- D-08 Draft PR
 ```
 
-Follow the tree with this decision-details table. Populate every cell for every decision; use `not applicable` only when the decision genuinely had no alternative or user-involvement state.
+Follow the tree with this decision-details table. Populate every cell for every decision. When only one credible path exists, list it as option `1.`, explain it, and mark it as recommended. Never use `not applicable` for `Created at`, `Options`, `Recommendation`, or `Selection`; use it in another field only when that field genuinely has no applicable state.
 
 ```text
-| Node | Trigger | Evidence | Options | Recommendation | Selection | Reason | Risk | Reversibility | User involvement | Outcome |
-| Source branch | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
-| Worktree | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
-| Tracking | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
-| Requirements | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
-| Implementation | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
-| Implementation approach | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
-| Verification | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
-| Review fixes | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
-| Draft PR | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+| Node | Created at | Trigger | Evidence | Options | Recommendation | Selection | Reason | Risk | Reversibility | User involvement | Outcome |
+| Source branch | ... | ... | ... | 1. ... - ... [Recommended]<br>2. ... - ... | Option 1 - ... | Option 1 - ... | ... | ... | ... | ... | ... |
+| Worktree | ... | ... | ... | 1. ... - ... [Recommended]<br>2. ... - ... | Option 1 - ... | Option 1 - ... | ... | ... | ... | ... | ... |
+| Tracking | ... | ... | ... | 1. ... - ... [Recommended]<br>2. ... - ... | Option 1 - ... | Option 1 - ... | ... | ... | ... | ... | ... |
+| Requirements | ... | ... | ... | 1. ... - ... [Recommended]<br>2. ... - ... | Option 1 - ... | Option 1 - ... | ... | ... | ... | ... | ... |
+| Implementation | ... | ... | ... | 1. ... - ... [Recommended]<br>2. ... - ... | Option 1 - ... | Option 1 - ... | ... | ... | ... | ... | ... |
+| Implementation approach | ... | ... | ... | 1. ... - ... [Recommended]<br>2. ... - ... | Option 1 - ... | Option 1 - ... | ... | ... | ... | ... | ... |
+| Verification | ... | ... | ... | 1. ... - ... [Recommended]<br>2. ... - ... | Option 1 - ... | Option 1 - ... | ... | ... | ... | ... | ... |
+| Review fixes | ... | ... | ... | 1. ... - ... [Recommended]<br>2. ... - ... | Option 1 - ... | Option 1 - ... | ... | ... | ... | ... | ... |
+| Draft PR | ... | ... | ... | 1. ... - ... [Recommended]<br>2. ... - ... | Option 1 - ... | Option 1 - ... | ... | ... | ... | ... | ... |
 ```
 
-Include one table row for every tree node, including child decisions, in the same order as the tree. For English reports, use these exact `Outcome` values for the eight required phase rows in phase order: `Base recorded`, `Worktree ready`, `Read-back verified`, `Criteria mapped`, `Behavior implemented`, `Passed`, `Re-review clean`, and `URL and refs verified`. Use the actual verified outcome for child decisions. Put details and the next decision in `Evidence` or explanatory prose. Translate these values consistently for a non-English destination. Keep failed attempts and recovered history in explanatory prose, not in the final outcome cell.
+Include one table row for every tree node, including child decisions, in the same order as the tree. Copy each record's original `Created at` value into its row. Render numbered options and their explanations in one cell separated by `<br>`, preserving the single recommendation marker and the explicit option references in `Recommendation` and `Selection`. For English reports, use these exact `Outcome` values for the eight required phase rows in phase order: `Base recorded`, `Worktree ready`, `Read-back verified`, `Criteria mapped`, `Behavior implemented`, `Passed`, `Re-review clean`, and `URL and refs verified`. Use the actual verified outcome for child decisions. Put details and the next decision in `Evidence` or explanatory prose. Translate these values consistently for a non-English destination. Keep failed attempts and recovered history in explanatory prose, not in the final outcome cell.
 
 Do not invent branches or evidence that were not considered during execution.
 
@@ -153,6 +160,8 @@ Before emitting the terminal response, re-read this contract and the ledger, the
 - the decision-ledger read-back record contains its absolute private Markdown path ending in `-decision-tree.md`;
 - the header records the session ID, session name, and task summary;
 - the Git-state record proves the default ignored, untracked, and commit-excluded state or the exact explicit-user exception;
+- every decision row contains its original valid RFC 3339 creation time;
+- every option list is consecutively numbered, gives every option a meaningful explanation, marks exactly one recommendation, and matches the explicit `Recommendation` and `Selection` option references;
 - every appended decision appears once in the tree and once in the table;
 - every table cell is populated and every outcome uses the latest verified update;
 - all eight delivery phases appear in order for a successful delivery;
