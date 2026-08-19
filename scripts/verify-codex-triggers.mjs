@@ -340,7 +340,11 @@ const AUTO_DEVELOP_STATUS_LABELS = new Set([
   "starting commit",
   "task branch",
   "worktree",
+  "decision ledger",
   "decision ledger read-back",
+  "decision ledger header",
+  "decision ledger git state",
+  "decision ledger schema",
   "tracking match",
   "tracking creation readiness",
   "tracking action",
@@ -415,15 +419,49 @@ const selectedBranch = (records) => {
   return selectedBranchFailure.test(reason) ? undefined : branch;
 };
 
-// 成功报告必须证明私有 Markdown 账本已按追加模式读回并完成节点核对。
+// 决策树文件必须具备稳定身份，并证明其私有目录与 Git 交付内容隔离。
+const hasDecisionTreeFileName = (ledgerPath) =>
+  path.isAbsolute(ledgerPath) && /[^/\\]+-decision-tree\.md$/i.test(ledgerPath);
+
+const hasDecisionLedgerHeader = (records) => {
+  const value = records.get("decision ledger header")?.value || "";
+  const fields = value.split(";").map((field) => field.trim().replace(/\.$/, ""));
+  if (fields.length !== 3) return false;
+  const [sessionId, sessionName, taskSummary] = fields;
+  return (
+    /^session ID\s+\S.+$/i.test(sessionId) &&
+    /^session name\s+\S.+$/i.test(sessionName) &&
+    /^task summary\s+\S.+$/i.test(taskSummary)
+  );
+};
+
+const hasVerifiedDecisionLedgerGitIsolation = (records) => {
+  const value = records.get("decision ledger git state")?.value || "";
+  const fields = value.split(";").map((field) => field.trim().replace(/\.$/, ""));
+  if (fields.length !== 4) return false;
+  const [directoryField, ignored, trackingState, commitState] = fields;
+  const directory = directoryField.replace(/^agent-private directory\s+/i, "");
+  const hasDefaultIsolation =
+    /^untracked$/i.test(trackingState) && /^excluded from commits$/i.test(commitState);
+  const hasExplicitException =
+    /^force-added exact ledger$/i.test(trackingState) &&
+    /^included by explicit user request$/i.test(commitState);
+  return (
+    directory !== directoryField &&
+    /(?:^|\/)\.[^/]+\/plans\/?$/i.test(directory) &&
+    !directory.split("/").includes("..") &&
+    /^ignored$/i.test(ignored) &&
+    (hasDefaultIsolation || hasExplicitException)
+  );
+};
+
 const hasVerifiedDecisionLedger = (records) => {
   const value = records.get("decision ledger read-back")?.value || "";
   const fields = value.split(";").map((field) => field.trim().replace(/\.$/, ""));
   if (fields.length !== 4) return false;
   const [ledgerPath, format, updateMode, reconciliation] = fields;
   return (
-    path.isAbsolute(ledgerPath) &&
-    /\.md$/i.test(ledgerPath) &&
+    hasDecisionTreeFileName(ledgerPath) &&
     /^format Markdown$/i.test(format) &&
     /^append-only updates verified$/i.test(updateMode) &&
     /^all reported nodes reconciled$/i.test(reconciliation)
@@ -945,6 +983,9 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     : undefined;
 
   if (caseId === "auto-develop-ledger-progress") {
+    const records = indexAutoDevelopStatusRecords(
+      output.split(/\r?\n/).map((line) => line.trim()),
+    );
     const durableLedgerSignals = [
       /(?:decision|audit) ledger/i,
       /private/i,
@@ -955,6 +996,19 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     ];
     if (durableLedgerSignals.some((signal) => !signal.test(output))) {
       throw new Error("auto-develop did not preserve a durable append-only ledger across the resumed turn");
+    }
+    const ledgerPath = records.get("decision ledger")?.value || "";
+    if (!hasDecisionTreeFileName(ledgerPath)) {
+      throw new Error("auto-develop did not use the required decision-tree file name");
+    }
+    if (!hasDecisionLedgerHeader(records)) {
+      throw new Error("auto-develop did not preserve the required session metadata in the decision ledger header");
+    }
+    if (!hasVerifiedDecisionLedgerGitIsolation(records)) {
+      throw new Error("auto-develop did not verify decision ledger Git isolation");
+    }
+    if (!/^options;\s*recommendation;\s*selection\.?$/i.test(records.get("decision ledger schema")?.value || "")) {
+      throw new Error("auto-develop did not preserve decision options, recommendation, and selection");
     }
     return;
   }
@@ -1135,6 +1189,12 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     if (!hasVerifiedDecisionLedger(statusRecords)) {
       throw new Error("auto-develop did not read back a durable decision ledger");
     }
+    if (!hasDecisionLedgerHeader(statusRecords)) {
+      throw new Error("auto-develop did not report decision ledger session metadata");
+    }
+    if (!hasVerifiedDecisionLedgerGitIsolation(statusRecords)) {
+      throw new Error("auto-develop did not report verified decision ledger Git isolation");
+    }
     if (AUTO_DEVELOP_PAUSE_LABELS.some((label) => statusRecords.has(label))) {
       throw new Error("auto-develop mixed successful and paused delivery states");
     }
@@ -1263,19 +1323,24 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
       phaseLineIndex = nextLineIndex;
     }
     const headerCells = tableLines.length > 0 ? parseReportTableCells(tableLines[0]) : [];
+    const normalizedHeaderCells = headerCells.map((cell) => cell.toLowerCase());
+    if (!["recommendation", "selection"].every((header) => normalizedHeaderCells.includes(header))) {
+      throw new Error("auto-develop did not preserve decision recommendation and selection fields");
+    }
     const requiredHeaders = [
       "node",
       "trigger",
       "evidence",
       "options",
-      "choice",
+      "recommendation",
+      "selection",
       "reason",
       "risk",
       "reversibility",
       "user involvement",
       "outcome",
     ];
-    if (requiredHeaders.some((header) => !headerCells.map((cell) => cell.toLowerCase()).includes(header))) {
+    if (requiredHeaders.some((header) => !normalizedHeaderCells.includes(header))) {
       throw new Error("auto-develop did not preserve decision evidence and reversibility fields");
     }
     const detailRows = tableLines.slice(1).map(parseReportTableCells);
