@@ -4,10 +4,10 @@
 
 ## Quick Install
 
-Install every skill for the 13 primary supported agents:
+Install every skill for the 14 primary supported agents:
 
 ```bash
-npx skills add roxi3906/the-way-of-roxi --skill '*' --agent codex claude-code cursor gemini-cli github-copilot opencode amp cline goose kiro-cli qwen-code roo windsurf --copy -y
+npx skills add roxi3906/the-way-of-roxi --skill '*' --agent codex claude-code cursor gemini-cli github-copilot opencode amp cline goose kiro-cli kimi-code-cli qwen-code roo windsurf --copy -y
 ```
 
 `--copy` is intentional for the mixed shared and agent-native catalog roots. It ensures one multi-agent install populates every documented project directory.
@@ -54,6 +54,7 @@ The locked `skills` CLI is exercised against a fresh temporary installation for 
 | Cline | `.agents/skills` | Uses enabled skill descriptions for matching; name the skill explicitly when needed |
 | Goose | `.goose/skills` | Loads matching skills automatically; use `/skills skill-name` explicitly |
 | Kiro CLI | `.kiro/skills` | Activates matching skills automatically; use `/skill-name` explicitly |
+| Kimi Code CLI | `.agents/skills` | May activate from the description; use `/skill:skill-name` to select explicitly |
 | Qwen Code | `.qwen/skills` | Invokes matching skills through the model; use `/skill-name` explicitly |
 | Roo Code | `.roo/skills` | Loads matching skills on demand; name the skill explicitly when needed |
 | Windsurf | `.windsurf/skills` | Activates matching skills from their descriptions; name the skill explicitly when needed |
@@ -65,9 +66,10 @@ Invoke `auto-develop` through the host Skill picker or its tested explicit form:
 - Codex: `$auto-develop`
 - Amp, Claude Code, Cursor, GitHub Copilot, Kiro CLI, OpenCode, and Qwen Code: `/auto-develop`
 - Goose: `/skills auto-develop`
+- Kimi Code CLI: `/skill:auto-develop`
 - Cline, Gemini CLI, Roo Code, and Windsurf: `Use the auto-develop skill for this request.`
 
-The canonical Skill combines a portable `invocation/manual-only: "true"` metadata contract, OpenCode's `opencode/autoinvoke: "false"`, Codex's `allow_implicit_invocation: false`, and an in-Skill invocation gate. Codex and OpenCode enforce their native controls before loading the Skill. Other hosts rely on explicit invocation plus the portable runtime gate because their native `disable-model-invocation` extension is not accepted by the repository's strict cross-agent Skill validator.
+The canonical Skill combines a portable `invocation/manual-only: "true"` metadata contract, the native `disable-model-invocation: true` frontmatter control, OpenCode's `opencode/autoinvoke: "false"`, Codex's `allow_implicit_invocation: false`, and an in-Skill invocation gate. Codex, OpenCode, Claude Code, and Kimi Code CLI enforce their native controls before loading the Skill. Other hosts rely on explicit invocation plus the portable runtime gate.
 
 The explicit invocation activates `auto-develop` for the rest of that session. Every later message follows the Skill without repeating the invocation, including new repository deliveries requested after an earlier draft PR completes. The activation ends only with the session, never carries into a new session, and keeps each delivery limited to the task requested by its current user message.
 
@@ -110,7 +112,7 @@ The explicit invocation activates `auto-develop` for the rest of that session. E
 Install one skill for selected agents:
 
 ```bash
-npx skills add roxi3906/the-way-of-roxi --skill roxis-way --agent codex claude-code cursor gemini-cli github-copilot opencode amp cline goose kiro-cli qwen-code roo windsurf --copy -y
+npx skills add roxi3906/the-way-of-roxi --skill roxis-way --agent codex claude-code cursor gemini-cli github-copilot opencode amp cline goose kiro-cli kimi-code-cli qwen-code roo windsurf --copy -y
 ```
 
 Replace `roxis-way` with `auto-develop`, `tapd-sync`, or `tapd-summary` as needed. Inspect all available skills with:
@@ -159,6 +161,7 @@ npx skills add roxi3906/the-way-of-roxi --list
 - Binds the session only after user confirmation
 - Creates valuable follow-up work without repeated TAPD business confirmation while respecting host runtime permissions
 - Completes the child requirements covered by successful code commits
+- Allows a workflow-defined direct initial-to-terminal transition; completing the bound parent additionally requires scoped direct, whole-tree, reviewed-plan, or task-cleanup authorization from the user
 - After binding, ends applicable final answers with links to the bound parent and relevant children
 - Keeps one TAPD write owner across primary, forked, and compacted contexts
 - Keeps the original task moving when TAPD is unavailable
@@ -181,7 +184,7 @@ npm install
 npm run verify
 ```
 
-`npm test` validates structured metadata, host invocation profiles, positive and negative trigger contracts, manual-only controls, per-agent installations for all 13 supported agents, and the combined `--copy` quick-install path across every documented catalog root. Installation verification parses each copied `auto-develop` bundle and requires the portable intent contract plus the OpenCode and Codex native controls to survive unchanged. `npm run verify:codex` additionally launches fresh, isolated, read-only Codex sessions for explicit and negative Auto Develop behavior, the repository workflow, TAPD Sync lifecycle, and explicit-only summary behavior. Single-turn cases remain ephemeral. The Auto Develop stateful case resumes one temporary session from a durable-ledger midpoint through a final report, a separate delivery, risk-gate pause and continuation, and an ordinary question; it then opens a fresh thread with an inherited parent summary and verifies that the earlier activation does not carry over. The TAPD Sync lifecycle case separately resumes one temporary session across the first match, a dormant reply, and candidate selection. Capable-adapter cases expose only a bundled read-only TAPD fixture and reject non-TAPD commands or write-like TAPD commands, while unavailable and negative cases reject all tool activity. The online smoke copies only the current `CODEX_HOME` authentication into an isolated temporary home, exposes no host credentials or live TAPD configuration to model tools, and fails clearly when Codex is not authenticated. Runtime activation behavior for other agents is documented from their product guidance; this repository verifies their locked CLI installation artifacts rather than launching authenticated sessions for every product.
+`npm test` validates structured metadata, host invocation profiles, positive and negative trigger contracts, manual-only controls, per-agent installations for all 14 supported agents, and the combined `--copy` quick-install path across every documented catalog root. Installation verification parses each copied `auto-develop` bundle and requires the portable intent contract plus the `disable-model-invocation`, OpenCode, and Codex native controls to survive unchanged. `npm run verify:codex` additionally launches fresh, isolated, read-only Codex sessions for explicit and negative Auto Develop behavior, the repository workflow, TAPD Sync lifecycle, and explicit-only summary behavior. Single-turn cases remain ephemeral. The Auto Develop stateful case resumes one temporary session from a durable-ledger midpoint through a final report, a separate delivery, risk-gate pause and continuation, and an ordinary question; it then opens a fresh thread with an inherited parent summary and verifies that the earlier activation does not carry over. The TAPD Sync lifecycle case separately resumes one temporary session across the first match, a dormant reply, and candidate selection. Capable-adapter cases expose only a bundled read-only TAPD fixture and reject non-TAPD commands or write-like TAPD commands, while unavailable and negative cases reject all tool activity. The online smoke copies only the current `CODEX_HOME` authentication into an isolated temporary home, exposes no host credentials or live TAPD configuration to model tools, and fails clearly when Codex is not authenticated. Runtime activation behavior for other agents is documented from their product guidance; this repository verifies their locked CLI installation artifacts rather than launching authenticated sessions for every product.
 
 ## License
 
