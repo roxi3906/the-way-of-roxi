@@ -69,6 +69,8 @@ Invoke `auto-develop` through the host Skill picker or its tested explicit form:
 
 The canonical Skill combines a portable `invocation/manual-only: "true"` metadata contract, OpenCode's `opencode/autoinvoke: "false"`, Codex's `allow_implicit_invocation: false`, and an in-Skill invocation gate. Codex and OpenCode enforce their native controls before loading the Skill. Other hosts rely on explicit invocation plus the portable runtime gate because their native `disable-model-invocation` extension is not accepted by the repository's strict cross-agent Skill validator.
 
+The explicit invocation activates `auto-develop` for the rest of that session. Every later message follows the Skill without repeating the invocation, including new repository deliveries requested after an earlier draft PR completes. The activation ends only with the session, never carries into a new session, and keeps each delivery limited to the task requested by its current user message.
+
 ## Repository Layout
 
 ```text
@@ -122,7 +124,8 @@ npx skills add roxi3906/the-way-of-roxi --list
 `auto-develop` performs an explicitly authorized autonomous delivery:
 
 - Runs only when selected through the host's Skill UI, invocation syntax, or a direct instruction to use the Skill
-- Treats invocation as task-scoped authorization for a dedicated worktree, commits, branch push, and a draft PR
+- Stays active for every later message in the same session without repeated invocation
+- Treats activation plus each current request as task-scoped authorization for a dedicated worktree, commits, branch push, and a draft PR
 - Selects the first available source branch in `develop`, `dev/main`, `main`, `master` order and preserves it as the PR target
 - Reuses configured workflows, task synchronization, and progress monitoring; a unique match at or above 90% can be bound automatically
 - Makes recommended low-risk decisions while pausing only for indispensable user actions or material risk
@@ -178,7 +181,7 @@ npm install
 npm run verify
 ```
 
-`npm test` validates structured metadata, host invocation profiles, positive and negative trigger contracts, manual-only controls, per-agent installations for all 13 supported agents, and the combined `--copy` quick-install path across every documented catalog root. Installation verification parses each copied `auto-develop` bundle and requires the portable intent contract plus the OpenCode and Codex native controls to survive unchanged. `npm run verify:codex` additionally launches fresh, isolated, read-only Codex sessions for explicit and negative Auto Develop behavior, the repository workflow, TAPD Sync lifecycle, and explicit-only summary behavior. Single-turn cases remain ephemeral. The Auto Develop stateful case resumes one temporary session from a durable-ledger midpoint into its final report without putting the expected decision-tree fields in the user prompts. The TAPD Sync lifecycle case separately resumes one temporary session across the first match, a dormant reply, and candidate selection. Capable-adapter cases expose only a bundled read-only TAPD fixture and reject non-TAPD commands or write-like TAPD commands, while unavailable and negative cases reject all tool activity. The online smoke copies only the current `CODEX_HOME` authentication into an isolated temporary home, exposes no host credentials or live TAPD configuration to model tools, and fails clearly when Codex is not authenticated. Runtime activation behavior for other agents is documented from their product guidance; this repository verifies their locked CLI installation artifacts rather than launching authenticated sessions for every product.
+`npm test` validates structured metadata, host invocation profiles, positive and negative trigger contracts, manual-only controls, per-agent installations for all 13 supported agents, and the combined `--copy` quick-install path across every documented catalog root. Installation verification parses each copied `auto-develop` bundle and requires the portable intent contract plus the OpenCode and Codex native controls to survive unchanged. `npm run verify:codex` additionally launches fresh, isolated, read-only Codex sessions for explicit and negative Auto Develop behavior, the repository workflow, TAPD Sync lifecycle, and explicit-only summary behavior. Single-turn cases remain ephemeral. The Auto Develop stateful case resumes one temporary session from a durable-ledger midpoint through a final report, a separate delivery, risk-gate pause and continuation, and an ordinary question; it then opens a fresh thread with an inherited parent summary and verifies that the earlier activation does not carry over. The TAPD Sync lifecycle case separately resumes one temporary session across the first match, a dormant reply, and candidate selection. Capable-adapter cases expose only a bundled read-only TAPD fixture and reject non-TAPD commands or write-like TAPD commands, while unavailable and negative cases reject all tool activity. The online smoke copies only the current `CODEX_HOME` authentication into an isolated temporary home, exposes no host credentials or live TAPD configuration to model tools, and fails clearly when Codex is not authenticated. Runtime activation behavior for other agents is documented from their product guidance; this repository verifies their locked CLI installation artifacts rather than launching authenticated sessions for every product.
 
 ## License
 
