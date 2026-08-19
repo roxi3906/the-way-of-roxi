@@ -30,7 +30,7 @@ const expectedAgentProfiles = {
     installRoot: ".claude/skills",
     invocationTemplate: "/{skill}",
     invocationForm: "slash",
-    manualOnlyControl: "runtime-gate",
+    manualOnlyControl: "disable-model-invocation",
   },
   cline: {
     installRoot: ".agents/skills",
@@ -61,6 +61,12 @@ const expectedAgentProfiles = {
     invocationTemplate: "/skills {skill}",
     invocationForm: "skills-command",
     manualOnlyControl: "runtime-gate",
+  },
+  "kimi-code-cli": {
+    installRoot: ".agents/skills",
+    invocationTemplate: "/skill:{skill}",
+    invocationForm: "slash-colon",
+    manualOnlyControl: "disable-model-invocation",
   },
   "kiro-cli": {
     installRoot: ".kiro/skills",
@@ -129,9 +135,10 @@ test("every canonical skill has valid portable metadata and a complete trigger c
     const openai = YAML.parse(await readFile(openaiPath, "utf8"));
     const contract = contracts.skills[name];
 
-    const expectedMetadataKeys = name === "auto-develop"
-      ? ["description", "metadata", "name"]
-      : ["description", "name"];
+    const expectedMetadataKeys = {
+      "auto-develop": ["description", "disable-model-invocation", "metadata", "name"],
+      "tapd-summary": ["description", "disable-model-invocation", "name"],
+    }[name] ?? ["description", "name"];
     assert.deepEqual(Object.keys(metadata).sort(), expectedMetadataKeys);
     assert.equal(metadata.name, name);
     assert.match(metadata.name, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
@@ -167,6 +174,10 @@ test("every canonical skill has valid portable metadata and a complete trigger c
     assert.ok(openai.interface.short_description.length >= 25);
     assert.ok(openai.interface.short_description.length <= 64);
 
+    if (contract.invocationPolicy === "explicit-only") {
+      assert.equal(metadata["disable-model-invocation"], true);
+    }
+
     if (name === "auto-develop") {
       assert.equal(metadata.metadata?.["invocation/manual-only"], "true");
       assert.equal(metadata.metadata?.["opencode/autoinvoke"], "false");
@@ -197,6 +208,7 @@ test("auto-develop covers every explicit invocation form without leaking one int
     dollar: "$auto-develop",
     slash: "/auto-develop",
     "skills-command": "/skills auto-develop",
+    "slash-colon": "/skill:auto-develop",
     "direct-instruction": "use the auto-develop skill",
   };
 

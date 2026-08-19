@@ -20,6 +20,7 @@ const expectedAutoDevelopManualOnly = {
   openaiAllowImplicitInvocation: false,
   opencodeAutoinvoke: "false",
   portableManualOnly: "true",
+  disableModelInvocation: true,
 };
 
 test("the repository installs every canonical skill into every target agent catalog", () => {

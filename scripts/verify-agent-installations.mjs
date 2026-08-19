@@ -54,12 +54,14 @@ const verifyAutoDevelopManualOnly = async (installed) => {
     openaiAllowImplicitInvocation: openai.policy?.allow_implicit_invocation,
     opencodeAutoinvoke: metadata.metadata?.["opencode/autoinvoke"],
     portableManualOnly: metadata.metadata?.["invocation/manual-only"],
+    disableModelInvocation: metadata["disable-model-invocation"],
   };
 
   if (
     controls.openaiAllowImplicitInvocation !== false ||
     controls.opencodeAutoinvoke !== "false" ||
-    controls.portableManualOnly !== "true"
+    controls.portableManualOnly !== "true" ||
+    controls.disableModelInvocation !== true
   ) {
     throw new Error("installed auto-develop skill does not preserve every manual-only control");
   }

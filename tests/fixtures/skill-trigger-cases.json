@@ -8,6 +8,7 @@
     "gemini-cli",
     "github-copilot",
     "goose",
+    "kimi-code-cli",
     "kiro-cli",
     "opencode",
     "qwen-code",
@@ -23,6 +24,7 @@
     "gemini-cli": ".agents/skills",
     "github-copilot": ".agents/skills",
     "goose": ".goose/skills",
+    "kimi-code-cli": ".agents/skills",
     "kiro-cli": ".kiro/skills",
     "opencode": ".agents/skills",
     "qwen-code": ".qwen/skills",
@@ -46,7 +48,7 @@
       "installRoot": ".claude/skills",
       "invocationTemplate": "/{skill}",
       "invocationForm": "slash",
-      "manualOnlyControl": "runtime-gate"
+      "manualOnlyControl": "disable-model-invocation"
     },
     "cline": {
       "installRoot": ".agents/skills",
@@ -77,6 +79,12 @@
       "invocationTemplate": "/skills {skill}",
       "invocationForm": "skills-command",
       "manualOnlyControl": "runtime-gate"
+    },
+    "kimi-code-cli": {
+      "installRoot": ".agents/skills",
+      "invocationTemplate": "/skill:{skill}",
+      "invocationForm": "slash-colon",
+      "manualOnlyControl": "disable-model-invocation"
     },
     "kiro-cli": {
       "installRoot": ".kiro/skills",
@@ -132,6 +140,7 @@
       "positivePrompts": [
         "$auto-develop Implement this repository feature end to end.",
         "/skills auto-develop Deliver this change autonomously and report the decision tree.",
+        "/skill:auto-develop Ship this repository fix autonomously and open a draft PR.",
         "Use the auto-develop skill to fix this defect and open a draft pull request."
       ],
       "paraphrasePrompts": [
@@ -151,6 +160,7 @@
         "gemini-cli": "Use the auto-develop skill for this request.",
         "github-copilot": "/auto-develop",
         "goose": "/skills auto-develop",
+        "kimi-code-cli": "/skill:auto-develop",
         "kiro-cli": "/auto-develop",
         "opencode": "/auto-develop",
         "qwen-code": "/auto-develop",
@@ -195,6 +205,7 @@
         "gemini-cli": "Use the roxis-way skill for this request.",
         "github-copilot": "/roxis-way",
         "goose": "/skills roxis-way",
+        "kimi-code-cli": "/skill:roxis-way",
         "kiro-cli": "/roxis-way",
         "opencode": "/roxis-way",
         "qwen-code": "/roxis-way",
@@ -241,6 +252,7 @@
         "gemini-cli": "Use the tapd-sync skill for this request.",
         "github-copilot": "/tapd-sync",
         "goose": "/skills tapd-sync",
+        "kimi-code-cli": "/skill:tapd-sync",
         "kiro-cli": "/tapd-sync",
         "opencode": "/tapd-sync",
         "qwen-code": "/tapd-sync",
@@ -288,6 +300,7 @@
         "gemini-cli": "Use the tapd-summary skill for this request.",
         "github-copilot": "/tapd-summary",
         "goose": "/skills tapd-summary",
+        "kimi-code-cli": "/skill:tapd-summary",
         "kiro-cli": "/tapd-summary",
         "opencode": "/tapd-summary",
         "qwen-code": "/tapd-summary",
