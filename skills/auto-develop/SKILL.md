@@ -1,6 +1,6 @@
 ---
 name: auto-develop
-description: Explicit-only autonomous repository delivery that stays active after invocation for every later message in the same session until it ends. Activate it initially only when explicitly selected through a host Skill selection, `$auto-develop`, `/auto-develop`, `/skills auto-develop`, `/skill:auto-develop` where supported, or a direct instruction to use the auto-develop Skill. It isolates work, implements and verifies the task, fixes deep-review findings, pushes a branch, opens a draft PR, and reports a decision tree. Never invoke automatically in a fresh session for ordinary automatic development, auto development, 自动开发, coding, implementation, review, or pull-request requests.
+description: Explicit-only autonomous repository delivery that stays active after invocation for every later message in the same session until it ends. Activate it initially only when explicitly selected through a host Skill selection, `$auto-develop`, `/auto-develop`, `/skills auto-develop`, `/skill:auto-develop` where supported, or a direct instruction to use the auto-develop Skill. It isolates work, synchronizes configured project-management tracking throughout delivery phases, implements and verifies the task, fixes deep-review findings, pushes a branch, opens a draft PR, and reports a decision tree. Never invoke automatically in a fresh session for ordinary automatic development, auto development, 自动开发, coding, implementation, review, or pull-request requests.
 disable-model-invocation: true
 metadata:
   invocation/manual-only: "true"
@@ -34,7 +34,7 @@ For each repository delivery requested while the session mode is `active`, treat
 - modify task-scoped code, content, configuration, tests, and generated files;
 - create commits and push the task branch;
 - create a draft pull request targeting the recorded source branch;
-- automatically bind or create a configured tracking item when the 90% gate passes.
+- automatically bind or create a configured tracking item when the 90% gate passes, then synchronize delivery phases through that integration.
 
 Scope this authorization to the repository delivery requested by the current user message. Session activation does not authorize unrelated work or broaden that message's task boundary. Continue to obey system and host permissions, repository instructions, credential and identity requirements, legal approvals, and any stronger safety rule. Never claim that invocation supplies a missing login, MFA response, secret, external approval, or required virtual-machine container authorization.
 
@@ -103,13 +103,35 @@ Cap a candidate below 90 when the substantive delivery objective is not equivale
 
 Verify every bind or create by reading the resulting state back before claiming success.
 
+## Synchronize the Delivery Lifecycle
+
+Once tracking is bound, keep the bound delivery item current across this canonical sequence:
+
+1. `preparation and isolation`
+2. `technical research`
+3. `solution design`
+4. `implementation`
+5. `verification`
+6. `code review`
+7. `delivery closeout`
+
+Emit one idempotent event whenever a stage becomes `started`, `completed`, `blocked`, or `skipped`. Assign every event a stable event ID that is persisted before the first write and never reused for another event. Include that ID, the delivery identity, stage, state, concise outcome summary, durable evidence, next stage, and an RFC 3339 event time in the runtime timezone. Write `started` before doing the stage's substantive work and write its terminal event immediately after the completion criterion is known. When tracking becomes available after preparation and isolation, backfill that completed stage once; when binding is restored later, backfill every earlier unsynchronized event once in original event order.
+
+Use the configured integration's native phase, progress, milestone, or activity capability. Prefer an existing configured phase or progress field only when its meaning and allowed value are verified and its retrievable audit history preserves the exact event payload after later values replace the current value; otherwise append an activity record or comment to the bound item. Change a workflow status only when the integration proves one unique legal mapping for the delivery stage. Never create a custom field, rewrite the work-item description, or guess a status merely to represent progress.
+
+Use a hybrid child model. The bound item always receives the full lifecycle. Create or reuse a direct child only when a stage produces a distinct outcome that can be reviewed, accepted, or delivered independently, such as a standalone research report, architecture decision, separately shippable implementation, or scoped review remediation. Name the outcome rather than the generic stage. Routine internal work receives no child, and multiple internal steps for one independently acceptable outcome share one child. Preserve the integration's parent, owner, type, idempotency, completion-evidence, and workflow rules; code-bearing children remain commit-gated.
+
+After every phase or child mutation, fetch the affected item and its activity or field history. Verify the exact stable event ID and event payload, plus the parent relationship when applicable. Retry only transient failures and only within the configured integration's retry limits. Record every attempted event, read-back result, and unsynchronized event in the decision ledger. Continue delivery after an unavailable or exhausted optional tracking integration, but never report that phase as synchronized; apply the risk gate only when successful project-management synchronization is itself an explicit acceptance criterion.
+
+The existing execution phases map to this lifecycle as follows: context discovery and task isolation produce `preparation and isolation`; repository and tool investigation produce `technical research`; acceptance mapping and approach selection produce `solution design`; code changes produce `implementation`; test and build evidence produce `verification`; the independent review-and-repair loop produces `code review`; commit, push, draft-PR read-back, reconciliation, and the terminal report produce `delivery closeout`.
+
 ## 4. Analyze and Decide
 
 Translate the request into observable acceptance criteria, constraints, affected paths, compatibility expectations, and verification evidence. Investigate answers available from the repository, runtime, configured tools, or authoritative sources.
 
 For ordinary ambiguity, choose the option with the strongest evidence and lowest task risk, record the alternatives and rationale, and continue. Ask the user only when the risk gate requires it.
 
-Complete this phase only when every acceptance criterion has an implementation path and a verification method.
+Complete this phase only when every acceptance criterion has an implementation path and a verification method, and the technical-research and solution-design stage outcomes have been synchronized or recorded as unsynchronized.
 
 ## 5. Implement and Verify
 
@@ -117,7 +139,7 @@ Follow the repository's established implementation and comment rules. Prefer a f
 
 Run directly related tests as work progresses. Diagnose and repair ordinary test failures, build failures, lint failures, and reproducible environment problems without pausing for the user. Expand validation when implementation evidence reveals wider risk, and record why.
 
-Complete this phase only when all acceptance criteria are implemented, applicable validation passes, and the working diff contains no known accidental changes.
+Complete this phase only when all acceptance criteria are implemented, applicable validation passes, the working diff contains no known accidental changes, and the implementation and verification stage outcomes have been synchronized or recorded as unsynchronized.
 
 ## 6. Review and Repair Deeply
 
@@ -133,6 +155,8 @@ Rank findings by severity and include concrete evidence. Automatically fix every
 
 Apply the risk gate to a recommendation only when fixing it requires a major scope or business decision. Never silently defer a recommended finding; record the reason and residual risk when it cannot be resolved.
 
+Complete this phase only after the code-review stage outcome and any independently valuable review-remediation child have been synchronized or recorded as unsynchronized.
+
 ## 7. Commit, Push, and Open the Draft PR
 
 Inspect the final diff and exclude unrelated files or hunks. Unless the user explicitly requested the ledger as a shared artifact, verify before every commit that its exact path is absent from the index, and verify before push and draft-PR creation that it is absent from every task commit and the complete pull-request diff. Remove only the ledger from Git delivery state if a check fails, preserving the private working file. Follow repository commit conventions, commit the verified task changes, and push the task branch. Treat invocation as the exact pull-request authorization required by stricter workflows.
@@ -146,6 +170,8 @@ Do not merge the PR and do not clean the worktree or task branch in this Skill.
 Before writing a terminal response for a delivery or risk-gate pause, re-read this Skill, [references/execution-report.md](references/execution-report.md), and that delivery's private ledger. Reconcile every ledger entry and outcome update with the final status records, connected tree, and decision-details table. The delivery response is invalid if the ledger read-back record, any material decision, any required phase, or any decision-detail field is missing. A message that does not start or continue a delivery receives an ordinary response under the active session rules without reading an earlier ledger or rendering an execution report.
 
 Render the final report with the exact contract in [references/execution-report.md](references/execution-report.md). Attach the absolute private decision-tree document path in every terminal delivery response, then report the actual commands, evidence, review findings, fixes, and verification outcomes; never infer successful state from an attempted command. A risk-gate pause must still render the ledger path and entries accumulated through the blocker.
+
+Before a successful terminal response, synchronize `delivery closeout` as completed with commit, push, draft-PR, ledger-reconciliation, and report-preflight evidence, then read it back. For a risk-gate pause, record `delivery closeout` as `blocked` only when closeout has started and the configured integration accepts and returns that event; otherwise record the attempted event as unsynchronized and leave closeout incomplete. Complete closeout only after the blocker is resolved. Include the aggregate phase synchronization, per-event payloads, and hybrid-child results required by the execution report contract; list any unsynchronized event without turning an attempted write into success.
 
 After a draft PR has been created and verified, include the worktree path and task branch, then remind the user:
 

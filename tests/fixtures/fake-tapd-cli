@@ -22,12 +22,17 @@ terminal_coverage_complete=true
 if [ -f "$fixture_directory/terminal-coverage-incomplete" ]; then
   terminal_coverage_complete=false
 fi
+phase_writable=false
+if [ -f "$fixture_directory/phase-writable" ]; then
+  phase_writable=true
+fi
+phase_events_file="$fixture_directory/phase-events.ndjson"
 
 case "$command_name" in
   --help|-h|help)
     printf '%s\n' '{"fixture_operation":"help"}'
     cat <<'EOF'
-fake-tapd-cli: authenticated read-only TAPD fixture
+fake-tapd-cli: authenticated TAPD fixture
 
 Every command prints JSON. Available commands:
   tapd-cli status
@@ -38,13 +43,15 @@ Every command prints JSON. Available commands:
   tapd-cli work-items list --workspace-id ID --model stories|bugs|tasks --page N --page-size N
   tapd-cli work-items get --workspace-id ID --id ID
   tapd-cli work-items history --workspace-id ID --id ID
+  tapd-cli work-items activity append --workspace-id ID --id ID --event-id ID --delivery-id ID --stage STAGE --state STATE --summary TEXT --evidence TEXT --next-stage STAGE --event-time RFC3339
 
 The workspaces response is exhaustive when complete is true. List responses are
-fully paginated when has_more is false. This fixture has no write commands.
+fully paginated when has_more is false. Phase activity writes are enabled only
+when the phase-writable scenario marker is present.
 EOF
     ;;
   status)
-    printf '%s\n' '{"fixture_operation":"status","authenticated":true,"read_only":true,"configured_workspaces_complete":true}'
+    printf '{"fixture_operation":"status","authenticated":true,"read_only":%s,"configured_workspaces_complete":true}\n' "$([ "$phase_writable" = "true" ] && printf false || printf true)"
     ;;
   identity)
     printf '%s\n' '{"fixture_operation":"identity","id":"user-1","nick":"roxi","creator":"roxi","active":true}'
@@ -108,7 +115,62 @@ EOF
           printf '%s\n' '{"fixture_operation":"work-items-history-invalid","error":"not_found"}' >&2
           exit 3
         fi
-        printf '%s\n' '{"fixture_operation":"work-items-history-parent-1","items":[],"complete":true}'
+        if [ "$phase_writable" = "true" ]; then
+          printf '%s' '{"fixture_operation":"work-items-history-parent-1","items":[],"phase_events":[{"event_id":"delivery-42-02","delivery_id":"delivery-42","stage":"technical research","state":"started","summary":"research started","evidence":"decision ledger D-02","next_stage":"technical research","event_time":"2026-08-19T09:01:00+08:00"}'
+          if [ -f "$phase_events_file" ]; then
+            while IFS= read -r phase_event; do
+              printf ',%s' "$phase_event"
+            done < "$phase_events_file"
+          fi
+          printf '%s\n' '],"complete":true}'
+        else
+          printf '%s\n' '{"fixture_operation":"work-items-history-parent-1","items":[],"complete":true}'
+        fi
+        ;;
+      activity)
+        if [ "$phase_writable" != "true" ] || [ "${3:-}" != "append" ]; then
+          printf '%s\n' '{"fixture_operation":"work-items-activity-write-disabled","error":"read_only"}' >&2
+          exit 2
+        fi
+        requested_workspace=$(argument_value --workspace-id "$@" || true)
+        requested_id=$(argument_value --id "$@" || true)
+        event_id=$(argument_value --event-id "$@" || true)
+        delivery_id=$(argument_value --delivery-id "$@" || true)
+        stage=$(argument_value --stage "$@" || true)
+        state=$(argument_value --state "$@" || true)
+        summary=$(argument_value --summary "$@" || true)
+        evidence=$(argument_value --evidence "$@" || true)
+        next_stage=$(argument_value --next-stage "$@" || true)
+        event_time=$(argument_value --event-time "$@" || true)
+        if [ "$requested_workspace" != "workspace-1" ] || [ "$requested_id" != "parent-1" ]; then
+          printf '%s\n' '{"fixture_operation":"work-items-activity-invalid","error":"not_found"}' >&2
+          exit 3
+        fi
+        if [ -z "$event_id" ] || [ -z "$delivery_id" ] || [ -z "$stage" ] || [ -z "$state" ] || [ -z "$summary" ] || [ -z "$evidence" ] || [ -z "$next_stage" ] || [ -z "$event_time" ]; then
+          printf '%s\n' '{"fixture_operation":"work-items-activity-invalid","error":"missing_phase_payload"}' >&2
+          exit 4
+        fi
+        case "$state" in
+          started|completed|blocked|skipped) ;;
+          *)
+            printf '%s\n' '{"fixture_operation":"work-items-activity-invalid","error":"invalid_state"}' >&2
+            exit 4
+            ;;
+        esac
+        case "$event_time" in
+          ????-??-??T??:??:??Z|????-??-??T??:??:??+??:??|????-??-??T??:??:??-??:??) ;;
+          *)
+            printf '%s\n' '{"fixture_operation":"work-items-activity-invalid","error":"invalid_event_time"}' >&2
+            exit 4
+            ;;
+        esac
+        if [ "$event_id" = "delivery-42-02" ] || { [ -f "$phase_events_file" ] && grep -Fq "\"event_id\":\"$event_id\"" "$phase_events_file"; }; then
+          printf '{"fixture_operation":"work-items-activity-reused","event_id":"%s"}\n' "$event_id"
+          exit 0
+        fi
+        phase_event=$(printf '{"event_id":"%s","delivery_id":"%s","stage":"%s","state":"%s","summary":"%s","evidence":"%s","next_stage":"%s","event_time":"%s"}' "$event_id" "$delivery_id" "$stage" "$state" "$summary" "$evidence" "$next_stage" "$event_time")
+        printf '%s\n' "$phase_event" >> "$phase_events_file"
+        printf '{"fixture_operation":"work-items-activity-appended","phase_event":%s}\n' "$phase_event"
         ;;
       *)
         printf '%s\n' '{"error":"unknown read action"}' >&2

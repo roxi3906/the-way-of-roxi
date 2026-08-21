@@ -33,9 +33,9 @@ All skills follow the open Agent Skills specification. The `skills` CLI maps the
 
 It currently ships four skills:
 
-- `skills/auto-develop/`: Explicitly invoked autonomous delivery through implementation, deep review, recommended fixes, a draft PR, and a traceable decision tree.
+- `skills/auto-develop/`: Explicitly invoked autonomous delivery with project-management phase synchronization, implementation, deep review, recommended fixes, a draft PR, and a traceable decision tree.
 - `skills/roxis-way/`: Reusable collaboration, implementation, testing, language, and delivery rules for any user.
-- `skills/tapd-sync/`: Session-aware TAPD work-item matching, binding, child-requirement creation, and commit-driven completion.
+- `skills/tapd-sync/`: Session-aware TAPD work-item matching, binding, parent phase progress, selective child creation, and evidence-driven completion.
 - `skills/tapd-summary/`: Explicitly invoked, read-only daily work and next-day plan summaries grouped by project.
 
 ## Agent Compatibility
@@ -72,6 +72,8 @@ Invoke `auto-develop` through the host Skill picker or its tested explicit form:
 The canonical Skill combines a portable `invocation/manual-only: "true"` metadata contract, the native `disable-model-invocation: true` frontmatter control, OpenCode's `opencode/autoinvoke: "false"`, Codex's `allow_implicit_invocation: false`, and an in-Skill invocation gate. Codex, OpenCode, Claude Code, and Kimi Code CLI enforce their native controls before loading the Skill. Other hosts rely on explicit invocation plus the portable runtime gate.
 
 The explicit invocation activates `auto-develop` for the rest of that session. Every later message follows the Skill without repeating the invocation, including new repository deliveries requested after an earlier draft PR completes. The activation ends only with the session, never carries into a new session, and keeps each delivery limited to the task requested by its current user message.
+
+For each delivery, `auto-develop` synchronizes preparation, technical research, solution design, implementation, verification, code review, and closeout through the user's configured project-management integration. The bound parent records the complete lifecycle. Child work items are reserved for independently acceptable outcomes, so routine internal phases do not create tracking noise.
 
 ## Repository Layout
 
@@ -160,7 +162,9 @@ npx skills add roxi3906/the-way-of-roxi --list
 - Ranks up to three matching open work items at session start
 - Binds the session only after user confirmation
 - Creates valuable follow-up work without repeated TAPD business confirmation while respecting host runtime permissions
-- Completes the child requirements covered by successful code commits
+- Records bound delivery phases on the parent through verified configured fields or activity entries, including ordered backfill after a late or restored binding
+- Creates phase children only for independently acceptable outcomes; routine stages remain parent progress
+- Completes code-bearing children only when covered by successful commits, and non-code phase children only from durable accepted evidence
 - Allows a workflow-defined direct initial-to-terminal transition; completing the bound parent additionally requires scoped direct, whole-tree, reviewed-plan, or task-cleanup authorization from the user
 - After binding, ends applicable final answers with links to the bound parent and relevant children
 - Keeps one TAPD write owner across primary, forked, and compacted contexts

@@ -226,6 +226,24 @@ test("auto-develop preserves the repository workflow's comment policy", async ()
   assert.doesNotMatch(contents, /Add comments only where the logic would otherwise be difficult to understand\./);
 });
 
+test("phase synchronization preserves event history and honest closeout states", async () => {
+  const autoDevelop = await readFile(path.join(skillsRoot, "auto-develop", "SKILL.md"), "utf8");
+  const tapdSync = await readFile(path.join(skillsRoot, "tapd-sync", "SKILL.md"), "utf8");
+  const executionReport = await readFile(
+    path.join(skillsRoot, "auto-develop", "references", "execution-report.md"),
+    "utf8",
+  );
+
+  assert.match(autoDevelop, /stable event ID/i);
+  assert.match(autoDevelop, /risk-gate pause[^\n]+delivery closeout[^\n]+blocked/i);
+  assert.match(autoDevelop, /Complete closeout only after the blocker is resolved/i);
+  assert.match(tapdSync, /stable event ID/i);
+  assert.match(tapdSync, /retrievable audit history/i);
+  assert.match(tapdSync, /exact event payload/i);
+  assert.doesNotMatch(tapdSync, /outcome identity as the idempotency key/i);
+  assert.match(executionReport, /Tracking phase event <stable event ID>: delivery=<stable delivery identity>/i);
+});
+
 test("every canonical skill keeps invocation portable across host agents", async () => {
   const names = await discoverSkillNames();
   const contracts = await readContracts();

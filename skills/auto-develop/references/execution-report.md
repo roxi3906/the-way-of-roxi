@@ -73,7 +73,7 @@ Keep status claims separate from explanatory prose so a later reader can disting
 For English reports, use these labels when their phase applies; translate them consistently for another destination language:
 
 ```text
-Authorization: worktree; task branch; modify task files; commit; push; draft PR; bind or create tracking item.
+Authorization: worktree; task branch; modify task files; commit; push; draft PR; bind or create tracking item; synchronize tracking phases.
 Source priority: develop > dev/main > main > master.
 Selected source branch: <verified branch>
 Starting commit: <full verified commit hash>.
@@ -86,6 +86,9 @@ Tracking match: unique candidate at <score>.
 Tracking creation readiness: <score, when creation is considered>
 Tracking action: <automatically bound | automatically created and bound | unavailable>
 Tracking read-back: verified <bound | created and bound> item <identifier>.
+Tracking phase synchronization: <stage>=<ordered states>,<read-back verified | unsynchronized reason>; <next stage>=<ordered states>,<read-back verified | unsynchronized reason>.
+Tracking phase children: <independent outcome>=<created or reused lifecycle>,<read-back verified | unsynchronized reason>; routine stages=none.
+Tracking phase event <stable event ID>: delivery=<stable delivery identity>; stage=<stage>; state=<state>; summary=<outcome>; evidence=<durable evidence>; next stage=<stage or terminal report>; event time=<RFC 3339>; write=<appended | field history | backfilled | unsynchronized>; read-back=<verified | failed with reason>.
 Tracking write: none.
 Risk gate status: paused.
 Deep review: <actionable recommended findings or none>
@@ -103,6 +106,12 @@ Use `Tracking match: none.` when no candidate qualifies. For a conflict, list ev
 
 After a successful bind or create-and-bind action, include `Tracking read-back` only after the destination item has been fetched and its bound state verified. A successful delivery must also include the worktree path with `state ready`, the decision-ledger header and absolute-path read-back records, and the verified default Git state. When the user explicitly requested the ledger in Git, replace the default Git-state suffix with `ignored; force-added exact ledger; included by explicit user request` and include the request evidence. Attempted, failed, pending, or placeholder states are not success evidence.
 
+When tracking is bound, emit exactly one `Tracking phase synchronization` record in canonical order for preparation and isolation, technical research, solution design, implementation, verification, code review, and delivery closeout. A completed ordinary stage records `started and completed,read-back verified`; preparation may instead record `completed,backfilled,read-back verified`. Preserve `blocked` or `skipped` with its concrete reason and read-back result. Never label an unsynchronized write as verified.
+
+Immediately after the aggregate record, emit one `Tracking phase event <stable event ID>` record for every attempted event in original order. Persist the ID before the first write and include exactly the stable delivery identity, stage, state, summary, evidence, next stage, RFC 3339 event time, write result, and read-back result. For a successful delivery, preparation has one completed backfill event and every later stage has a started event followed by a completed event. A risk-gate pause must stop at the actual blocker and must not report `delivery closeout=completed`; record a blocked event only when it was accepted and read back, otherwise record the attempt as unsynchronized.
+
+Emit exactly one `Tracking phase children` record when tracking is bound. List each independently acceptable outcome that created, reused, advanced, or completed a child, including its read-back result, then end with `routine stages=none`. When no stage has an independently acceptable outcome, use `independent outcomes=none; routine stages=none`. A generic stage name is not an independent outcome.
+
 Use exactly four semicolon-delimited fields for a successful draft PR record: `URL`, `state draft`, `base`, and `head`, in that order. The head must exactly equal the recorded task branch and differ from the base. Do not append another state or a conflicting qualification.
 
 Pause evidence fields must contain concrete facts or choices. Values such as `none`, `unknown`, `TBD`, `not available`, `unspecified`, or equivalent placeholders do not satisfy the pause contract.
@@ -114,7 +123,7 @@ Use only the records that describe the actual path. For example, a tracking conf
 Use destination language rules and include these sections when applicable:
 
 1. **Outcome**: State whether every acceptance criterion passed or identify the exact blocker.
-2. **Delivery Context**: Show the source branch and full starting commit, task branch, worktree, tracking or monitoring result, and the absolute decision-tree document path.
+2. **Delivery Context**: Show the source branch and full starting commit, task branch, worktree, tracking or monitoring result, aggregate phase synchronization and hybrid-child result, and the absolute decision-tree document path.
 3. **Implemented**: Describe observable behavior and affected business or content paths.
 4. **Verification**: List commands or checks with their final results. For every command, emit `Command: <actual command>` followed by `Result: <verified result>`. Distinguish direct, expanded, and substituted coverage.
 5. **Deep Review**: List findings by severity, the recommended fixes applied, re-review outcome, and any residual risk.
@@ -165,6 +174,9 @@ Before emitting the terminal response, re-read this contract and the ledger, the
 - every appended decision appears once in the tree and once in the table;
 - every table cell is populated and every outcome uses the latest verified update;
 - all eight delivery phases appear in order for a successful delivery;
+- every canonical project-management phase appears once in order with its attempted states and read-back result when tracking is bound;
+- every aggregate phase state is backed by an ordered, uniquely identified event payload with durable evidence and historical read-back;
+- every phase child represents an independently acceptable outcome and routine stages created no child;
 - a paused delivery includes every decision accumulated through the blocker;
 - the final status records contain no attempted, stale, or contradictory success claim.
 
