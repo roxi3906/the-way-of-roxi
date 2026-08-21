@@ -39,12 +39,12 @@ const triggerCases = [
       {
         behavior: "auto-develop-ledger-progress",
         toolPolicy: "none",
-        prompt: "$eval-auto-develop Without running tools or changing files, simulate a small repository delivery through context discovery, source isolation, tracking, and requirements mapping. Assume develop, dev/main, main, and master all exist; develop is selected at commit 0123456789abcdef0123456789abcdef01234567; the task branch is custom/repository-topic in /tmp/feature-worktree; and one configured tracking candidate is a unique 94% match whose binding read-back succeeds. The task will continue in a later turn. Report the midpoint state and how its audit history survives that continuation, but do not finish the simulated delivery.",
+        prompt: "$eval-auto-develop Without running tools or changing files, simulate a small repository delivery through context discovery, source isolation, tracking, technical research, and solution design. Assume develop, dev/main, main, and master all exist; develop is selected at commit 0123456789abcdef0123456789abcdef01234567; the task branch is custom/repository-topic in /tmp/feature-worktree; and one configured tracking candidate is a unique 94% match whose binding read-back succeeds. Preparation is backfilled after binding. Technical research produces one standalone, independently acceptable outcome named delivery architecture decision, while solution design and every later delivery stage are routine internal work. Every attempted tracking write and child mutation succeeds and its read-back verifies. The task will continue in a later turn. Report the midpoint state and how its audit history survives that continuation, but do not finish the simulated delivery.",
       },
       {
         behavior: "auto-develop",
         toolPolicy: "none",
-        prompt: "Continue the same simulation. Assume the implementation satisfies every mapped criterion; npm test passes 23/23; deep review finds one actionable recommended fix that is applied, revalidated, and re-reviewed cleanly; and draft PR read-back verifies URL https://example.invalid/pull/42, state draft, base develop, and head custom/repository-topic. Complete the simulated autonomous delivery report according to the selected Skill. Do not ask for routine workspace or validation choices, and keep cleanup separate from this delivery.",
+        prompt: "Continue the same simulation. Assume the implementation satisfies every mapped criterion; npm test passes 23/23; deep review finds one actionable recommended fix that is applied, revalidated, and re-reviewed cleanly; draft PR read-back verifies URL https://example.invalid/pull/42, state draft, base develop, and head custom/repository-topic; and every remaining phase start, completion, child, and parent-progress write succeeds with verified read-back. Complete the simulated autonomous delivery report according to the selected Skill, including aggregate phase synchronization and hybrid-child records. Do not ask for routine workspace or validation choices, and keep cleanup separate from this delivery.",
       },
       {
         behavior: "auto-develop-session-active",
@@ -110,6 +110,7 @@ const triggerCases = [
     sourceSkillId: "tapd-sync",
     evalName: "eval-tapd-sync-lifecycle",
     useFakeTapd: true,
+    fakeTapdScenario: "phase-writable",
     mode: "stateful",
     turns: [
       {
@@ -128,6 +129,11 @@ const triggerCases = [
         toolPolicy: "tapd-read-only",
         requiredTapdReads: ["work-items-get-parent-1"],
         prompt: "1",
+      },
+      {
+        behavior: "tapd-sync-phase-recorded",
+        toolPolicy: "tapd-phase-write",
+        prompt: "Continue delivery delivery-42 with the bound parent. Technical research is a routine internal stage and produces no independent child. Its started event with stable event ID delivery-42-02 may already have succeeded before read-back was lost, so inspect parent history before any retry. Then record the completed event once with stable event ID delivery-42-03, delivery identity delivery-42, summary 'research complete', evidence 'decision ledger D-03', next stage 'solution design', and event time 2026-08-19T09:02:00+08:00. Read the exact event payload back before reporting it. Do not read or edit repository files.",
       },
     ],
   },
@@ -349,6 +355,8 @@ const AUTO_DEVELOP_STATUS_LABELS = new Set([
   "tracking creation readiness",
   "tracking action",
   "tracking read-back",
+  "tracking phase synchronization",
+  "tracking phase children",
   "tracking write",
   "risk gate status",
   "deep review",
@@ -529,6 +537,136 @@ const hasVerifiedTrackingReadBack = (records, expectedAction) => {
     new RegExp(`^verified ${action} item ([^\\s.;,]+)\\.?$`, "i"),
   );
   return Boolean(match && isMeaningfulStatusValue(match[1]));
+};
+
+const REQUIRED_TRACKING_PHASES = [
+  "preparation and isolation",
+  "technical research",
+  "solution design",
+  "implementation",
+  "verification",
+  "code review",
+  "delivery closeout",
+];
+
+// 阶段状态使用稳定的键值记录，避免自然语言叙述掩盖漏同步或漏回读。
+const parseTrackingPhaseEntries = (value) => {
+  const entries = new Map();
+  for (const rawEntry of String(value || "").replace(/\.$/, "").split(";")) {
+    const [rawName, ...rawDetails] = rawEntry.split("=");
+    const name = rawName.trim().toLowerCase();
+    if (!name || rawDetails.length !== 1 || entries.has(name)) return undefined;
+    const details = rawDetails[0]
+      .split(",")
+      .map((detail) => detail.trim().toLowerCase().replace(/\.$/, ""))
+      .filter(Boolean);
+    if (details.length === 0) return undefined;
+    entries.set(name, new Set(details));
+  }
+  return entries;
+};
+
+const REQUIRED_TRACKING_PHASE_EVENT_SEQUENCE = REQUIRED_TRACKING_PHASES.flatMap((stage, index) =>
+  index === 0 ? [{ stage, state: "completed" }] : [
+    { stage, state: "started" },
+    { stage, state: "completed" },
+  ],
+);
+
+const parseTrackingPhaseEventPayloads = (lines) => {
+  const events = [];
+  const eventIds = new Set();
+  for (const line of lines) {
+    const match = line.match(/^Tracking phase event ([^:]+):\s*(.*)$/i);
+    if (!match) {
+      if (/^Tracking phase event\b/i.test(line)) return undefined;
+      continue;
+    }
+    const eventId = match[1].trim();
+    const fields = new Map();
+    for (const rawField of match[2].replace(/\.$/, "").split(";")) {
+      const [rawName, ...rawValue] = rawField.split("=");
+      const name = rawName.trim().toLowerCase();
+      const value = rawValue.join("=").trim();
+      if (!name || rawValue.length === 0 || !value || fields.has(name)) return undefined;
+      fields.set(name, value);
+    }
+    if (
+      !/^[a-z0-9][a-z0-9._-]*$/i.test(eventId) ||
+      eventIds.has(eventId) ||
+      fields.size !== 9 ||
+      !["delivery", "stage", "state", "summary", "evidence", "next stage", "event time", "write", "read-back"]
+        .every((name) => fields.has(name))
+    ) return undefined;
+    eventIds.add(eventId);
+    events.push({
+      eventId,
+      deliveryIdentity: fields.get("delivery"),
+      stage: fields.get("stage").toLowerCase(),
+      state: fields.get("state").toLowerCase(),
+      summary: fields.get("summary"),
+      evidence: fields.get("evidence"),
+      nextStage: fields.get("next stage").toLowerCase(),
+      eventTime: fields.get("event time"),
+      write: fields.get("write").toLowerCase(),
+      readBack: fields.get("read-back").toLowerCase(),
+    });
+  }
+  return events;
+};
+
+const hasCompleteTrackingPhaseEventPayloads = (lines) => {
+  const events = parseTrackingPhaseEventPayloads(lines);
+  if (!events || events.length !== REQUIRED_TRACKING_PHASE_EVENT_SEQUENCE.length) return false;
+  let previousTime = Number.NEGATIVE_INFINITY;
+  return events.every((event, index) => {
+    const expected = REQUIRED_TRACKING_PHASE_EVENT_SEQUENCE[index];
+    const eventTime = Date.parse(event.eventTime);
+    const valid =
+      event.deliveryIdentity === "delivery-42" &&
+      event.stage === expected.stage &&
+      event.state === expected.state &&
+      isMeaningfulStatusValue(event.summary) &&
+      isMeaningfulStatusValue(event.evidence) &&
+      isMeaningfulStatusValue(event.nextStage) &&
+      /^(?:appended|field history|backfilled)$/.test(event.write) &&
+      event.readBack === "verified" &&
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(event.eventTime) &&
+      Number.isFinite(eventTime) &&
+      eventTime > previousTime;
+    previousTime = eventTime;
+    return valid;
+  });
+};
+
+const hasVerifiedTrackingPhaseSynchronization = (records) => {
+  const entries = parseTrackingPhaseEntries(records.get("tracking phase synchronization")?.value);
+  if (
+    !entries ||
+    entries.size !== REQUIRED_TRACKING_PHASES.length ||
+    [...entries.keys()].some((phase, index) => phase !== REQUIRED_TRACKING_PHASES[index])
+  ) return false;
+  return REQUIRED_TRACKING_PHASES.every((phase) => {
+    const details = entries.get(phase);
+    if (!details?.has("read-back verified")) return false;
+    return phase === "preparation and isolation"
+      ? details.has("completed") && details.has("backfilled")
+      : details.has("started and completed");
+  });
+};
+
+const hasVerifiedHybridPhaseChildren = (records) => {
+  const entries = parseTrackingPhaseEntries(records.get("tracking phase children")?.value);
+  const research = entries?.get("delivery architecture decision");
+  const routineStages = entries?.get("routine stages");
+  return Boolean(
+    entries?.size === 2 &&
+    research?.has("created and completed") &&
+    research.has("independent outcome") &&
+    research.has("read-back verified") &&
+    routineStages?.size === 1 &&
+    routineStages.has("none"),
+  );
 };
 
 const hasVerifiedDraftPrReadBack = (records, expectedBase, expectedHead) => {
@@ -998,6 +1136,7 @@ const parseAutoDevelopOutput = (output) => {
 
 const AUTO_DEVELOP_REPORT_CASES = new Set([
   "auto-develop",
+  "auto-develop-phase-sync-blocked",
   "auto-develop-create",
   "auto-develop-risk",
   "auto-develop-blocked",
@@ -1171,6 +1310,73 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     return;
   }
 
+  if (caseId === "auto-develop-phase-sync-blocked") {
+    const { lines, statusRecords } = autoDevelopReport;
+    const phaseEntries = parseTrackingPhaseEntries(
+      statusRecords.get("tracking phase synchronization")?.value,
+    );
+    const preparation = phaseEntries?.get("preparation and isolation");
+    const research = phaseEntries?.get("technical research");
+    const unsynchronizedDetail = [...(research || [])].find((detail) => detail.startsWith("unsynchronized "));
+    const childEntries = parseTrackingPhaseEntries(statusRecords.get("tracking phase children")?.value);
+    const phaseEvents = parseTrackingPhaseEventPayloads(lines);
+    if (
+      phaseEntries?.size !== 2 ||
+      [...phaseEntries.keys()].some(
+        (phase, index) => phase !== REQUIRED_TRACKING_PHASES[index],
+      ) ||
+      !preparation?.has("completed") ||
+      !preparation.has("backfilled") ||
+      !preparation.has("read-back verified") ||
+      !research?.has("started and blocked") ||
+      !unsynchronizedDetail ||
+      !isMeaningfulStatusValue(unsynchronizedDetail.replace(/^unsynchronized\s+/, ""))
+    ) {
+      throw new Error("auto-develop phase pause omitted its unsynchronized phase failure");
+    }
+    if (
+      phaseEvents?.length !== 3 ||
+      phaseEvents.some((event, index) => {
+        const expected = [
+          { stage: "preparation and isolation", state: "completed", readBack: "verified" },
+          { stage: "technical research", state: "started", readBack: "verified" },
+          { stage: "technical research", state: "blocked", readBack: "failed" },
+        ][index];
+        return (
+          event.stage !== expected.stage ||
+          event.deliveryIdentity !== "delivery-42" ||
+          event.state !== expected.state ||
+          (expected.readBack === "failed"
+            ? !event.readBack.startsWith("failed ")
+            : event.readBack !== expected.readBack) ||
+          !isMeaningfulStatusValue(event.summary) ||
+          !isMeaningfulStatusValue(event.evidence) ||
+          !isMeaningfulStatusValue(event.nextStage) ||
+          !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(event.eventTime)
+        );
+      }) ||
+      phaseEvents[2].write !== "unsynchronized"
+    ) {
+      throw new Error("auto-develop phase pause omitted its phase event payloads");
+    }
+    if (
+      childEntries?.size !== 2 ||
+      !childEntries.get("independent outcomes")?.has("none") ||
+      !childEntries.get("routine stages")?.has("none")
+    ) {
+      throw new Error("auto-develop phase pause invented phase child work");
+    }
+    if (
+      !/^paused\.?$/i.test(statusRecords.get("risk gate status")?.value || "") ||
+      !["blocker", "preserved work", "resume condition"].every(
+        (label) => hasMeaningfulStatusValue(statusRecords, label),
+      )
+    ) {
+      throw new Error("auto-develop phase pause omitted its blocker or recovery evidence");
+    }
+    return;
+  }
+
   if (caseId === "auto-develop") {
     const { decisionTreeIndex, lines, narrativeLines, statusRecords, tableHeaderIndex, tableLines } = autoDevelopReport;
     const authorizationLine = statusRecords.get("authorization")?.line;
@@ -1187,6 +1393,7 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
       /bind/i,
       /create/i,
       /tracking|task sync/i,
+      /(?:synchroniz(?:e|ation)|sync)[^;\n]{0,40}(?:tracking )?phases?|(?:tracking )?phases?[^;\n]{0,40}(?:synchroniz(?:e|ation)|sync)/i,
     ];
     if (
       completeAuthorization.some((pattern) => !pattern.test(authorizationLine)) ||
@@ -1194,7 +1401,7 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     ) {
       throw new Error("auto-develop did not preserve the complete task-scoped authorization");
     }
-    if (/(?:may i|can i|should i|do you want me to|please authorize|confirm permission)[^\n]{0,100}(?:worktree|branch|modify|edit|commit|push|draft\s+(?:pr|pull request)|bind|tracking)/i.test(output)) {
+    if (/(?:may i|can i|should i|do you want me to|please authorize|confirm permission)[^\n]{0,100}(?:worktree|branch|modify|edit|commit|push|draft\s+(?:pr|pull request)|bind|tracking|sync(?:hronize)?\s+(?:tracking\s+)?phases?)/i.test(output)) {
       throw new Error("auto-develop asked again for an authorized operation");
     }
     if (!hasExactSourcePriority(statusRecords)) {
@@ -1237,6 +1444,15 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     }
     if (!hasVerifiedTrackingReadBack(statusRecords, "bind") || hasTrackingReadBackFailureEvidence(narrativeLines)) {
       throw new Error("auto-develop did not verify the tracking read-back after binding");
+    }
+    if (!hasVerifiedTrackingPhaseSynchronization(statusRecords)) {
+      throw new Error("auto-develop did not verify complete tracking phase synchronization");
+    }
+    if (!hasCompleteTrackingPhaseEventPayloads(lines)) {
+      throw new Error("auto-develop did not verify complete tracking phase event payloads");
+    }
+    if (!hasVerifiedHybridPhaseChildren(statusRecords)) {
+      throw new Error("auto-develop did not preserve hybrid phase child tracking");
     }
     if (
       !/^Deep review:.*actionable.*recommended/i.test(statusRecords.get("deep review")?.line || "") ||
@@ -1683,6 +1899,19 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     return;
   }
 
+  if (caseId === "tapd-sync-phase-recorded") {
+    const finalLine = output.trimEnd().split(/\r?\n/).at(-1) || "";
+    if (
+      !/^>?\s*TAPD:\s/.test(finalLine) ||
+      !/\[【Trigger Evaluation Repository】Improve README agent documentation\]\(https:\/\/tapd\.example\.invalid\/workitems\/parent\)/.test(finalLine) ||
+      !/(?:technical research|技术调研)/i.test(output) ||
+      !/(?:read-back|回读|读取验证)/i.test(output)
+    ) {
+      throw new Error("tapd-sync did not report the verified parent phase update");
+    }
+    return;
+  }
+
   if (caseId === "tapd-sync-query-default") {
     if (
       !/\[【Trigger Evaluation Repository】Improve README agent documentation\]\(https:\/\/tapd\.example\.invalid\/workitems\/parent\)/.test(output) ||
@@ -1895,7 +2124,7 @@ export const assertNoToolActivity = (stdout) => {
   }
 };
 
-const assertTapdOnlyCommand = (command) => {
+const assertTapdOnlyCommand = (command, { allowPhaseWrite = false } = {}) => {
   if (/`|\$\(|[<>]/.test(command)) {
     throw new Error(`Codex used a non-TAPD shell construct during adapter verification: ${command}`);
   }
@@ -1922,6 +2151,9 @@ const assertTapdOnlyCommand = (command) => {
       /^(?:work-item-types|workflows)(?:\s|$)/.test(args) ||
       /^work-items\s+(?:list|get|history)(?:\s|$)/.test(args)
     ) {
+      continue;
+    }
+    if (allowPhaseWrite && /^work-items\s+activity\s+append(?:\s|$)/.test(args)) {
       continue;
     }
     if (/\b(?:create|update|edit|delete|transition|complete|close|bind)\b/i.test(args)) {
@@ -1969,6 +2201,111 @@ export const assertReadOnlyTapdActivity = (stdout, requiredOperations = []) => {
     throw new Error(`Codex is missing required TAPD reads: ${missingOperations.join(", ")}`);
   }
   return [...new Set(commands)];
+};
+
+const isCompletePhaseEventPayload = (event, expectedState) => Boolean(
+  event &&
+  /^[a-z0-9][a-z0-9._-]*$/i.test(event.event_id || "") &&
+  event.delivery_id === "delivery-42" &&
+  event.stage === "technical research" &&
+  event.state === expectedState &&
+  isMeaningfulStatusValue(event.summary) &&
+  isMeaningfulStatusValue(event.evidence) &&
+  isMeaningfulStatusValue(event.next_stage) &&
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(event.event_time || "")
+);
+
+export const assertTapdPhaseWriteActivity = (stdout) => {
+  const operations = [];
+  const commands = [];
+  const prohibitedItemTypes = new Set([
+    "file_change",
+    "mcp_tool_call",
+    "web_search",
+    "computer_use",
+    "image_generation",
+  ]);
+
+  for (const event of parseCodexEvents(stdout)) {
+    if (prohibitedItemTypes.has(event?.item?.type)) {
+      throw new Error(`Codex used prohibited tool activity: ${event.item.type}`);
+    }
+    assertNoSandboxFailure(event);
+    if (event?.item?.type !== "command_execution") continue;
+    const command = Array.isArray(event.item.command)
+      ? event.item.command.join(" ")
+      : String(event.item.command || "");
+    assertTapdOnlyCommand(command, { allowPhaseWrite: true });
+    commands.push(command);
+    const commandOutput = [event.item.aggregated_output, event.item.output]
+      .filter((value) => value !== undefined)
+      .join("\n");
+    for (const line of commandOutput.split(/\r?\n/).filter(Boolean)) {
+      try {
+        const operation = JSON.parse(line);
+        if (operation.fixture_operation) operations.push(operation);
+      } catch {
+        // Non-JSON CLI help text is irrelevant to phase mutation verification.
+      }
+    }
+  }
+
+  if (commands.length === 0) throw new Error("Codex did not inspect or update the TAPD phase");
+  const appendOperations = operations.filter(
+    ({ fixture_operation: operation }) => operation === "work-items-activity-appended",
+  );
+  if (appendOperations.length !== 1) {
+    throw new Error("Codex did not append exactly one TAPD completion phase event");
+  }
+  const appendedOperation = appendOperations[0];
+  const appendIndex = operations.indexOf(appendedOperation);
+  const appendedEvent = appendedOperation.phase_event;
+  if (!isCompletePhaseEventPayload(appendedEvent, "completed")) {
+    throw new Error("Codex appended an incomplete TAPD phase event payload");
+  }
+  if (
+    appendedEvent.event_id !== "delivery-42-03" ||
+    appendedEvent.summary !== "research complete" ||
+    appendedEvent.evidence !== "decision ledger D-03" ||
+    appendedEvent.next_stage !== "solution design" ||
+    appendedEvent.event_time !== "2026-08-19T09:02:00+08:00"
+  ) {
+    throw new Error("Codex appended the wrong TAPD completion phase event");
+  }
+  const historiesBefore = operations.slice(0, appendIndex).filter(
+    ({ fixture_operation: operation }) => operation === "work-items-history-parent-1",
+  );
+  const recoveredStartedEvent = historiesBefore.some(({ phase_events: events }) =>
+    events?.some((phaseEvent) =>
+      phaseEvent.event_id === "delivery-42-02" &&
+      phaseEvent.summary === "research started" &&
+      phaseEvent.evidence === "decision ledger D-02" &&
+      phaseEvent.next_stage === "technical research" &&
+      phaseEvent.event_time === "2026-08-19T09:01:00+08:00" &&
+      isCompletePhaseEventPayload(phaseEvent, "started"),
+    ),
+  );
+  if (!recoveredStartedEvent) {
+    throw new Error("Codex did not recover the ambiguous TAPD phase event before writing");
+  }
+  const historiesAfter = operations.slice(appendIndex + 1).filter(
+    ({ fixture_operation: operation }) => operation === "work-items-history-parent-1",
+  );
+  const verifiedCompletion = historiesAfter.some(({ phase_events: events }) =>
+    events?.some((phaseEvent) =>
+      phaseEvent.event_id === appendedEvent.event_id &&
+      JSON.stringify(phaseEvent) === JSON.stringify(appendedEvent),
+    ),
+  );
+  if (!verifiedCompletion) {
+    throw new Error("Codex did not read back the exact TAPD phase event payload");
+  }
+  if (operations.some(({ fixture_operation: operation, event_id: eventId }) =>
+    operation === "work-items-activity-reused" && eventId === "delivery-42-02"
+  )) {
+    throw new Error("Codex retried a TAPD phase event already present in history");
+  }
+  return commands;
 };
 
 const runTriggerCase = async (triggerCase) => {
@@ -2060,6 +2397,8 @@ const runTriggerCase = async (triggerCase) => {
             result.stdout,
             turn.requiredTapdReads || triggerCase.requiredTapdReads || [],
           );
+        } else if (turn.toolPolicy === "tapd-phase-write") {
+          assertTapdPhaseWriteActivity(result.stdout);
         } else {
           assertNoToolActivity(result.stdout);
         }

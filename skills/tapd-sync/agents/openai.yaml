@@ -1,6 +1,6 @@
 interface:
   display_name: "TAPD Sync"
-  short_description: "Prompt once, then track after parent binding"
-  default_prompt: "Use $tapd-sync to match the first response, prompt once for a parent, pause when unbound, and maintain child work items after binding."
+  short_description: "Bind once, then track delivery phases"
+  default_prompt: "Use $tapd-sync to match the first response, prompt once for a parent, pause when unbound, record delivery phases on the bound parent, and maintain children only for independently valuable outcomes."
 policy:
   allow_implicit_invocation: true

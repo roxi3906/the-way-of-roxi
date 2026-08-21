@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { chmod, cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -427,12 +427,30 @@ test("Auto Develop survives a risk-gate pause and resumes the same delivery", as
 test("Codex trigger evidence distinguishes autonomous delivery, repository workflow, TAPD sync, and explicit summary behavior", async () => {
   const { assertAutoDevelopNotTriggered, assertSummaryNotTriggered, assertTriggerBehavior } = await loadVerifier();
 
+  const phaseEvent = (id, stage, state, nextStage, minute, write = "appended") =>
+    `Tracking phase event ${id}: delivery=delivery-42; stage=${stage}; state=${state}; summary=${stage} ${state}; evidence=decision ledger ${id}; next stage=${nextStage}; event time=2026-08-19T09:${String(minute).padStart(2, "0")}:00+08:00; write=${write}; read-back=verified.`;
+  const completeTrackingPhaseEvents = [
+    phaseEvent("delivery-42-01", "preparation and isolation", "completed", "technical research", 0, "backfilled"),
+    phaseEvent("delivery-42-02", "technical research", "started", "technical research", 1),
+    phaseEvent("delivery-42-03", "technical research", "completed", "solution design", 2),
+    phaseEvent("delivery-42-04", "solution design", "started", "solution design", 3),
+    phaseEvent("delivery-42-05", "solution design", "completed", "implementation", 4),
+    phaseEvent("delivery-42-06", "implementation", "started", "implementation", 5),
+    phaseEvent("delivery-42-07", "implementation", "completed", "verification", 6),
+    phaseEvent("delivery-42-08", "verification", "started", "verification", 7),
+    phaseEvent("delivery-42-09", "verification", "completed", "code review", 8),
+    phaseEvent("delivery-42-10", "code review", "started", "code review", 9),
+    phaseEvent("delivery-42-11", "code review", "completed", "delivery closeout", 10),
+    phaseEvent("delivery-42-12", "delivery closeout", "started", "delivery closeout", 11),
+    phaseEvent("delivery-42-13", "delivery closeout", "completed", "terminal report", 12),
+  ];
+
   const completeAutoDevelopOutput = [
     "SKILL_ACTIVATED: eval-auto-develop",
     "## Outcome",
     "All acceptance criteria passed.",
     "## Delivery Context",
-    "Authorization: worktree; task branch; modify task files; commit; push; draft PR; bind or create tracking item.",
+    "Authorization: worktree; task branch; modify task files; commit; push; draft PR; bind or create tracking item; synchronize tracking phases.",
     "Source priority: develop > dev/main > main > master.",
     "Selected source branch: develop",
     "Starting commit: 0123456789abcdef0123456789abcdef01234567.",
@@ -444,6 +462,9 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
     "Tracking match: unique candidate at 94%.",
     "Tracking action: automatically bound.",
     "Tracking read-back: verified bound item TASK-42.",
+    "Tracking phase synchronization: preparation and isolation=completed,backfilled,read-back verified; technical research=started and completed,read-back verified; solution design=started and completed,read-back verified; implementation=started and completed,read-back verified; verification=started and completed,read-back verified; code review=started and completed,read-back verified; delivery closeout=started and completed,read-back verified.",
+    "Tracking phase children: delivery architecture decision=created and completed,independent outcome,read-back verified; routine stages=none.",
+    ...completeTrackingPhaseEvents,
     "## Implemented",
     "Implemented the explicit invocation and autonomous delivery behavior.",
     "## Verification",
@@ -490,6 +511,115 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
       completeAutoDevelopOutput.join("\n"),
       "eval-auto-develop",
     ),
+  );
+  for (const [description, mutateReport, expectedError] of [
+    [
+      "missing phase synchronization",
+      (line) => !line.startsWith("Tracking phase synchronization:"),
+      /phase synchronization/,
+    ],
+    [
+      "phase without a started event",
+      (line) => !line.startsWith("Tracking phase synchronization:")
+        ? line
+        : line.replace("solution design=started and completed", "solution design=completed"),
+      /phase synchronization/,
+    ],
+    [
+      "phase without a verified read-back",
+      (line) => !line.startsWith("Tracking phase synchronization:")
+        ? line
+        : line.replace("implementation=started and completed,read-back verified", "implementation=started and completed"),
+      /phase synchronization/,
+    ],
+    [
+      "duplicate synchronized phase",
+      (line) => !line.startsWith("Tracking phase synchronization:")
+        ? line
+        : line.replace(
+          "technical research=started and completed,read-back verified;",
+          "technical research=started and completed,read-back verified; technical research=started and completed,read-back verified;",
+        ),
+      /phase synchronization/,
+    ],
+    [
+      "reordered synchronized phases",
+      (line) => !line.startsWith("Tracking phase synchronization:")
+        ? line
+        : line.replace(
+          "technical research=started and completed,read-back verified; solution design=started and completed,read-back verified;",
+          "solution design=started and completed,read-back verified; technical research=started and completed,read-back verified;",
+        ),
+      /phase synchronization/,
+    ],
+    [
+      "missing valuable phase child",
+      (line) => !line.startsWith("Tracking phase children:"),
+      /phase child tracking/,
+    ],
+    [
+      "child noise for routine phases",
+      (line) => !line.startsWith("Tracking phase children:")
+        ? line
+        : line.replace("routine stages=none", "routine stages=children created"),
+      /phase child tracking/,
+    ],
+    [
+      "missing phase event payload",
+      (line) => line !== completeTrackingPhaseEvents[6],
+      /phase event payloads/,
+    ],
+    [
+      "phase event without delivery identity",
+      (line) => line !== completeTrackingPhaseEvents[6]
+        ? line
+        : line.replace("delivery=delivery-42; ", ""),
+      /phase event payloads/,
+    ],
+  ]) {
+    const mutatedReport = description.startsWith("missing")
+      ? completeAutoDevelopOutput.filter(mutateReport)
+      : completeAutoDevelopOutput.map(mutateReport);
+    assert.throws(
+      () =>
+        assertTriggerBehavior(
+          "auto-develop",
+          mutatedReport.join("\n"),
+          "eval-auto-develop",
+        ),
+      expectedError,
+      description,
+    );
+  }
+  const blockedPhaseSynchronizationOutput = [
+    "SKILL_ACTIVATED: eval-auto-develop-phase-sync-blocked",
+    "Tracking phase synchronization: preparation and isolation=completed,backfilled,read-back verified; technical research=started and blocked,unsynchronized tracker write failed.",
+    "Tracking phase children: independent outcomes=none; routine stages=none.",
+    phaseEvent("delivery-42-blocked-01", "preparation and isolation", "completed", "technical research", 0, "backfilled"),
+    phaseEvent("delivery-42-blocked-02", "technical research", "started", "technical research", 1),
+    "Tracking phase event delivery-42-blocked-03: delivery=delivery-42; stage=technical research; state=blocked; summary=tracker write failed; evidence=tracker rejected event; next stage=technical research; event time=2026-08-19T09:02:00+08:00; write=unsynchronized; read-back=failed tracker write rejected.",
+    "Risk gate status: paused.",
+    "Blocker: verified project-management synchronization is an explicit acceptance criterion and the tracker write failed.",
+    "Preserved work: the isolated worktree and decision ledger remain available.",
+    "Resume condition: the configured tracker accepts and returns the technical-research event.",
+  ];
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "auto-develop-phase-sync-blocked",
+      blockedPhaseSynchronizationOutput.join("\n"),
+      "eval-auto-develop-phase-sync-blocked",
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "auto-develop-phase-sync-blocked",
+        blockedPhaseSynchronizationOutput
+          .map((line) => line.replace("unsynchronized tracker write failed", "read-back verified"))
+          .join("\n"),
+        "eval-auto-develop-phase-sync-blocked",
+      ),
+    /unsynchronized phase failure/,
   );
   assert.doesNotThrow(() =>
     assertTriggerBehavior(
@@ -1485,6 +1615,17 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
         "auto-develop",
         completeAutoDevelopOutput
           .map((line) => line.startsWith("Authorization:") ? line.replace("modify task files; ", "") : line)
+          .join("\n"),
+        "eval-auto-develop",
+      ),
+    /complete task-scoped authorization/,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "auto-develop",
+        completeAutoDevelopOutput
+          .map((line) => line.startsWith("Authorization:") ? line.replace("synchronize tracking phases.", "") : line)
           .join("\n"),
         "eval-auto-develop",
       ),
@@ -2943,6 +3084,98 @@ test("fake TAPD fixture refreshes only the exact retained candidate", async () =
   );
 });
 
+test("writable TAPD phase fixture recovers history and verifies one complete event", async () => {
+  const { assertTapdPhaseWriteActivity, runProcessWithClosedStdin } = await loadVerifier();
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "tapd-phase-fixture-"));
+  const fixture = path.join(tempRoot, "tapd-cli");
+  await cp(path.join(root, "tests", "fixtures", "fake-tapd-cli"), fixture);
+  await chmod(fixture, 0o755);
+  await writeFile(path.join(tempRoot, "phase-writable"), "");
+
+  try {
+    const historyBefore = await runProcessWithClosedStdin({
+      file: fixture,
+      args: ["work-items", "history", "--workspace-id", "workspace-1", "--id", "parent-1"],
+      timeoutMs: 2_000,
+    });
+    const append = await runProcessWithClosedStdin({
+      file: fixture,
+      args: [
+        "work-items", "activity", "append",
+        "--workspace-id", "workspace-1",
+        "--id", "parent-1",
+        "--event-id", "delivery-42-03",
+        "--delivery-id", "delivery-42",
+        "--stage", "technical research",
+        "--state", "completed",
+        "--summary", "research complete",
+        "--evidence", "decision ledger D-03",
+        "--next-stage", "solution design",
+        "--event-time", "2026-08-19T09:02:00+08:00",
+      ],
+      timeoutMs: 2_000,
+    });
+    const historyAfter = await runProcessWithClosedStdin({
+      file: fixture,
+      args: ["work-items", "history", "--workspace-id", "workspace-1", "--id", "parent-1"],
+      timeoutMs: 2_000,
+    });
+    const eventStream = [historyBefore, append, historyAfter]
+      .map(({ stdout }, index) => JSON.stringify({
+        type: "item.completed",
+        item: {
+          id: `phase-${index}`,
+          type: "command_execution",
+          command: index === 1
+            ? "tapd-cli work-items activity append --workspace-id workspace-1 --id parent-1 --event-id delivery-42-03 --delivery-id delivery-42 --stage 'technical research' --state completed --summary 'research complete' --evidence 'decision ledger D-03' --next-stage 'solution design' --event-time 2026-08-19T09:02:00+08:00"
+            : "tapd-cli work-items history --workspace-id workspace-1 --id parent-1",
+          aggregated_output: stdout,
+        },
+      }))
+      .join("\n");
+
+    assert.doesNotThrow(() => assertTapdPhaseWriteActivity(eventStream));
+    assert.throws(
+      () => assertTapdPhaseWriteActivity(eventStream.split("\n").slice(1).join("\n")),
+      /recover the ambiguous TAPD phase event/,
+    );
+    assert.throws(
+      () => assertTapdPhaseWriteActivity(eventStream
+        .split("\n")
+        .map((line) => {
+          const event = JSON.parse(line);
+          if (event.item.id === "phase-1") {
+            event.item.aggregated_output = event.item.aggregated_output.replace(
+              '"next_stage":"solution design",',
+              "",
+            );
+          }
+          return JSON.stringify(event);
+        })
+        .join("\n")),
+      /incomplete TAPD phase event payload/,
+    );
+    assert.throws(
+      () => assertTapdPhaseWriteActivity(eventStream
+        .split("\n")
+        .map((line) => {
+          const event = JSON.parse(line);
+          if (event.item.id === "phase-1") {
+            event.item.aggregated_output = event.item.aggregated_output.replace(
+              '"delivery_id":"delivery-42",',
+              "",
+            );
+          }
+          return JSON.stringify(event);
+        })
+        .join("\n")),
+      /incomplete TAPD phase event payload/,
+    );
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test("Codex trigger verification can select one case without weakening the default full run", async () => {
   const { selectTriggerCases } = await loadVerifier();
 
@@ -3004,8 +3237,10 @@ test("Codex trigger verification can select one case without weakening the defau
   assert.equal(selectTriggerCases("auto-develop-blocked")[0].sourceSkillId, "auto-develop");
   assert.equal(selectTriggerCases("tapd-summary")[0].evalName, "eval-tapd-summary");
   assert.match(selectTriggerCases("tapd-summary")[0].prompt, /^\$eval-tapd-summary\b/);
-  assert.equal(selectTriggerCases("tapd-sync-lifecycle")[0].turns.length, 3);
+  assert.equal(selectTriggerCases("tapd-sync-lifecycle")[0].turns.length, 4);
   assert.equal(selectTriggerCases("tapd-sync-lifecycle")[0].useFakeTapd, true);
+  assert.equal(selectTriggerCases("tapd-sync-lifecycle")[0].fakeTapdScenario, "phase-writable");
+  assert.equal(selectTriggerCases("tapd-sync-lifecycle")[0].turns[3].toolPolicy, "tapd-phase-write");
   assert.equal(selectTriggerCases("tapd-sync-query-default")[0].useFakeTapd, true);
   assert.equal(selectTriggerCases("tapd-sync-query-inclusive")[0].useFakeTapd, true);
   assert.equal(selectTriggerCases("tapd-sync-query-inclusive-incomplete")[0].fakeTapdScenario, "terminal-coverage-incomplete");

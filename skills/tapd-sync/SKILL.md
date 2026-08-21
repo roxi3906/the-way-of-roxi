@@ -1,11 +1,11 @@
 ---
 name: tapd-sync
-description: Automatically match the first substantive work-session response with TAPD and lightly recommend binding or creating a parent work item. If the first request neither asks for nor completes parent binding, stop all later automatic TAPD checks, work-item prompts, child handling, and TAPD footers; resume only when the user explicitly selects the first recommendation or requests parent binding or creation. After binding, maintain valuable child work items and complete only those covered by successful Git commits. Use for coding, implementation, fixes, debugging, refactoring, review, research, design, decisions, documentation, testing, releases, operations, repository maintenance, or explicit TAPD, requirement, defect, task, 需求, 缺陷, 任务, 工作项, binding, or sync requests. Do not use when the user explicitly selects `tapd-summary`, or for casual chat, acknowledgements, simple status or time queries, translations, or requests without an independent outcome.
+description: Automatically match the first substantive work-session response with TAPD and lightly recommend a parent work item binding. If that exchange ends unbound without parent intent, suspend later TAPD checks and output until the user explicitly resumes binding or creation. After binding, record delivery phases on the parent, create children only for independently valuable outcomes, and complete code-bearing children only from successful commits. Use for coding, fixes, debugging, refactoring, review, research, design, decisions, documentation, testing, releases, operations, repository maintenance, or explicit TAPD, requirement, defect, task, 需求, 缺陷, 任务, 工作项, binding, or sync requests. Do not use for `tapd-summary`, casual chat, acknowledgements, simple status or time queries, translations, or requests without an independent outcome.
 ---
 
 # TAPD Sync
 
-Connect the current work context to TAPD capabilities already configured in the runtime. Perform one read-only match before the first final answer and lightly recommend a parent binding there. If that first exchange ends without parent intent or a binding, suspend TAPD for later requests. Automatically maintain follow-up child requirements only after the user binds a parent work item.
+Connect the current work context to TAPD capabilities already configured in the runtime. Perform one read-only match before the first final answer and lightly recommend a parent binding there. If that first exchange ends without parent intent or a binding, suspend TAPD for later requests. After the user binds a parent, keep its delivery phase current and maintain child requirements only for independently valuable outcomes.
 
 ## Establish the Work Context
 
@@ -57,18 +57,19 @@ Maintain the following state in the current session context:
 - `tapd_binding`: The bound parent's workspace, project name, type, ID, and title.
 - `tapd_first_reply_sent`: Whether the first substantive request has received its final answer.
 - `tapd_sync_mode`: `active` before the first reply or during an explicit parent flow, `dormant` after an unbound first exchange without parent intent or after an explicit decline, and `bound` after a parent binding verifies successfully.
-- `tapd_session_children`: Child requirements created or reused in this session and the user requests they represent.
-- `tapd_reply_items`: The parent, candidates, and children relevant to the current final answer, including each user-readable title, URL, status, and action taken. Reset it for every substantive user request.
+- `tapd_session_children`: Child requirements created or reused in this session and the user requests or independently acceptable phase outcomes they represent.
+- `tapd_phase_events`: Phase events attempted for the bound delivery, keyed by a stable event ID persisted before the first write, with delivery, parent, stage, state, summary, event time, evidence, next stage, write result, and read-back result.
+- `tapd_reply_items`: The parent, candidates, phase updates, and children relevant to the current final answer, including each user-readable title, URL, status, and action taken. Reset it for every substantive user request.
 - `tapd_partial_writes`: Work items that were created but failed post-write verification, recording workspace, parent ID or top-level absence, normalized title, item ID, and failure reason.
 - `tapd_write_owner`: The stable identity of the single context currently responsible for TAPD writes.
 
-Keep this state only in the current work context. Restore it after context compaction only from a trusted summary of this same context. Preserve a trusted `dormant` mode and do not initialize again; if the summary proves the first reply was sent but contains neither a complete binding nor a mode, default to `dormant`. Restore `tapd_project_name` only when its status, exact value, normalized value, and evidence remain available; otherwise rerun project-name resolution and treat the binding's project name as one evidence source rather than an automatic answer. A binding is restorable only when its complete workspace, project name, type, ID, and title remain available; mark every restored binding as unverified. Before the first TAPD write after restoration, resolve `tapd_identity` and `tapd_owner` again from the current adapter instead of trusting their restored values, rerun project-name conflict checks, then fetch the parent and confirm that it exists, remains open, belongs to a configured workspace, and does not conflict with the resolved project name. Mark the binding verified and set `tapd_sync_mode` to `bound` only after all checks succeed. If owner resolution fails, keep the binding unverified and skip TAPD writes while continuing the user's original task. If the parent check fails, clear the binding, set `tapd_sync_mode` to `dormant`, and perform no TAPD write until the user explicitly requests parent binding or creation. If project-name evidence conflicts, keep the binding unverified and ask the user to resolve the name before any TAPD write. Never claim that the binding persists into a new work context.
+Keep this state only in the current work context. Restore it after context compaction only from a trusted summary of this same context. Preserve a trusted `dormant` mode and do not initialize again; if the summary proves the first reply was sent but contains neither a complete binding nor a mode, default to `dormant`. Restore `tapd_project_name` only when its status, exact value, normalized value, and evidence remain available; otherwise rerun project-name resolution and treat the binding's project name as one evidence source rather than an automatic answer. A binding is restorable only when its complete workspace, project name, type, ID, and title remain available; mark every restored binding as unverified. Restore `tapd_phase_events` only with their complete idempotency keys and results, mark their writes unverified, and fetch the parent fields or activity before reusing or retrying them. Before the first TAPD write after restoration, resolve `tapd_identity` and `tapd_owner` again from the current adapter instead of trusting their restored values, rerun project-name conflict checks, then fetch the parent and confirm that it exists, remains open, belongs to a configured workspace, and does not conflict with the resolved project name. Mark the binding verified and set `tapd_sync_mode` to `bound` only after all checks succeed. If owner resolution fails, keep the binding unverified and skip TAPD writes while continuing the user's original task. If the parent check fails, clear the binding, set `tapd_sync_mode` to `dormant`, and perform no TAPD write until the user explicitly requests parent binding or creation. If project-name evidence conflicts, keep the binding unverified and ask the user to resolve the name before any TAPD write. Never claim that the binding persists into a new work context.
 
 ## Keep One TAPD Write Owner
 
 - Make the primary work context the default `tapd_write_owner`.
 - Treat forked contexts and subagents as read-only TAPD workers unless the current write owner completes an explicit ownership handoff for one specific write.
-- Perform a handoff before delegated work starts: set `tapd_write_owner` to the delegate's stable context identity, provide the complete verified binding, the resolved `tapd_project_name` with its evidence, `tapd_owner` with its source, matching `tapd_partial_writes`, and exact write responsibility, and make the previous owner read-only for TAPD. If these changes cannot be represented as one exclusive handoff, do not delegate the write.
+- Perform a handoff before delegated work starts: set `tapd_write_owner` to the delegate's stable context identity, provide the complete verified binding, the resolved `tapd_project_name` with its evidence, `tapd_owner` with its source, matching `tapd_partial_writes`, relevant `tapd_phase_events`, and exact write responsibility, and make the previous owner read-only for TAPD. If these changes cannot be represented as one exclusive handoff, do not delegate the write.
 - Return ownership only after the delegate reports a final write result or a confirmed no-write result and can no longer retry. The primary context remains read-only until it observes that explicit return.
 - Allow only one context to create or complete TAPD work items for a given user request. Other contexts return their work result to the write owner without writing to TAPD.
 - If write ownership, the project-name resolution, or the binding snapshot is incomplete, do not infer them. Continue the user's original task without the TAPD write.
@@ -83,6 +84,8 @@ Probe capabilities instead of detecting or branching on the host product name. S
 4. **Unavailable**: If no method is usable or the configuration is incomplete, set the adapter to unavailable and continue the user's original task.
 
 Report only whether configuration names are available and which names are missing. Never display their values. If an adapter exists but cannot perform the required operations, continue to the next configured adapter. Never install tools, start authentication, bypass runtime permissions, or expand runtime access automatically.
+
+When a bound delivery supplies phase events, probe whether the selected adapter can inspect compatible parent fields or append and read back work-item activity or comments. Keep an otherwise usable adapter when this optional capability is absent, but mark phase synchronization unavailable and do not substitute an unverified write path.
 
 ## Resolve a Writable TAPD Owner
 
@@ -217,13 +220,32 @@ Requests that usually do not have tracking value include:
 
 Create only when independent tracking value is clear, avoiding low-value TAPD noise. Create separate children for multiple independently acceptable goals in one request. Create only one child for internal steps of the same deliverable.
 
+Apply the same test to an orchestrating workflow's delivery stage. A stage name alone has no independent tracking value. Create or reuse a child only for a distinct stage outcome that can be reviewed, accepted, or delivered independently; routine research, planning, implementation, verification, review, and closeout activity remains progress on the bound parent. Name a child for its outcome rather than for a generic stage.
+
+## Record Bound Delivery Phases
+
+Accept phase events from a configured delivery workflow only in `bound` mode and only from `tapd_write_owner`. Require a stable event ID persisted before the first write, stable delivery identity, canonical stage, state (`started`, `completed`, `blocked`, or `skipped`), concise summary, non-sensitive evidence, next stage, and RFC 3339 event time. Keep events in their original order. If preparation occurred before binding or a restored binding has unsynchronized events, backfill them once after parent verification.
+
+Before writing, verify the bound parent and inspect `tapd_phase_events` using the stable event ID as the idempotency key. Reuse only a verified event whose complete payload matches. If an earlier write may have succeeded without verification, fetch the affected parent activity and retrievable audit history before any retry; retry only after proving that exact event ID is absent. A matching ID with a different payload is a conflict and must never be overwritten or retried as a new event.
+
+Represent the event with the first supported option whose meaning is verified:
+
+1. An existing TAPD phase, progress, milestone, or equivalent field with a compatible allowed value and retrievable audit history that retains the exact event payload after later field updates.
+2. A parent work-item activity or comment containing the stable event ID, delivery identity, stage, state, summary, evidence, next stage, and event time.
+
+Use a workflow transition only when current TAPD metadata identifies one unique legal nonterminal mapping for that stage. Never create a field, overwrite the parent's description, guess a status, or move the parent to a terminal state for a phase event. After each write, fetch the parent activity or field history and require the exact event ID and exact event payload to be present before adding a successful `tapd_phase_events` record. The current value of a replaceable field alone is never historical read-back evidence.
+
+For an independently valuable phase outcome, create or reuse one direct child through the existing child-requirement flow and verify its owner and parent. Code-bearing children remain open until a successful Git commit covers their outcome. A non-code child may complete only when its durable artifact or explicit acceptance evidence is available and the workspace exposes one unambiguous legal successful transition. A stage label or an in-memory conclusion alone is not completion evidence.
+
+Apply the adapter's limited retry rules to transient failures. Preserve an unverified or failed event with its non-sensitive reason, continue the original delivery unless phase synchronization is its explicit acceptance criterion, and never claim the phase was synchronized without read-back.
+
 ## Create or Reuse Child Requirements Automatically
 
-For a valuable request, perform these steps before starting the user's requested work without asking for another TAPD business confirmation. Continue to honor host runtime permission prompts for tools, network access, and writes:
+For a valuable user request, perform these steps before starting the requested work. For an independently acceptable phase outcome discovered during delivery, perform them as soon as that outcome and its evidence are known. Do not ask for another TAPD business confirmation, and continue to honor host runtime permission prompts for tools, network access, and writes:
 
 1. Confirm that `tapd_sync_mode` is `bound`, the current context is `tapd_write_owner`, and the session still has a complete, verified binding. Otherwise skip the TAPD write and continue the user's requested work.
 2. Confirm that `tapd_project_name.status` is `resolved` and its value matches `tapd_binding.project_name`. If not, skip the TAPD write, report the project-name conflict, and continue the user's requested work.
-3. Generate a concise, specific, and verifiable `【{tapd_project_name.value}】{work_description}` title.
+3. Generate a concise, specific, and verifiable `【{tapd_project_name.value}】{work_description}` title that names the user outcome or independently acceptable phase outcome, never just the stage.
 4. Check `tapd_partial_writes` for the child logical idempotency key before querying reusable items or issuing a create. If a recorded child now passes verification, reuse it and continue at step 12 without creating another item.
 5. Query every page of the bound parent's open child requirements and compare normalized titles. Reuse only an open title match whose parent relationship and semicolon-normalized owner both verify against `tapd_binding` and `tapd_owner.value`. If matching items exist but none pass verification, do not reuse them, do not create a duplicate, report the conflict, and continue the user's original task.
 6. Before issuing a new create, perform the internal all-status idempotency safety read allowed by the discovery-scope rules: query every page and status for the logical key and record all matching item IDs. Do not reuse a closed match for a new request or expose it as a discovery result.
@@ -265,11 +287,12 @@ Immediately before a final answer for a substantive request, determine whether t
 1. When `tapd_sync_mode` is `dormant` and the current request has no explicit parent reactivation intent, stop this skill immediately. Do not access an adapter, evaluate work items or children, inspect commits for TAPD completion, or append a TAPD footer.
 2. When a dormant request explicitly reactivates parent binding or creation, set `tapd_sync_mode` to `active` and process only that explicit TAPD flow before continuing.
 3. On the first substantive final answer, ensure read-only initialization and matching have run, then recommend the best perfect matches or propose creation according to the first-answer rules.
-4. When `tapd_sync_mode` is `bound`, reset `tapd_reply_items`, re-evaluate whether the current request has independent tracking value, and create or reuse a missing valuable child before sending the final answer.
-5. Only in `bound` mode, inspect successful Git commits observed since the previous applicable gate and complete every bound child actually covered by those commits.
-6. Refresh only the parent, candidates, or children relevant to the applicable first-reply, explicit-parent, or bound flow. Resolve current user-facing URLs through the selected adapter or its documented TAPD URL format. Never invent a URL or expose an ID as fallback text.
-7. Record relevant items, statuses, actions, and non-sensitive failures in `tapd_reply_items`.
-8. Compose the original task result, then append exactly one compact TAPD footer as the last user-readable block. After the first footer, perform the one-time mode transition defined by the first-answer rules. After a later explicitly reactivated footer without a verified binding, return to `dormant` unless one specific user choice is still required for that same parent operation.
+4. When `tapd_sync_mode` is `bound`, reset `tapd_reply_items`, re-evaluate whether the current request and any newly reported phase outcome have independent tracking value, and create or reuse each missing valuable child before sending the final answer.
+5. In `bound` mode, process every phase event supplied since the previous applicable gate in event order, recover ambiguous writes before retrying, and read back every successful mutation.
+6. Only in `bound` mode, inspect successful Git commits observed since the previous applicable gate and complete every code-bearing bound child actually covered by those commits. Apply the durable-evidence rule to non-code phase children.
+7. Refresh only the parent, candidates, phase updates, or children relevant to the applicable first-reply, explicit-parent, or bound flow. Resolve current user-facing URLs through the selected adapter or its documented TAPD URL format. Never invent a URL or expose an ID as fallback text.
+8. Record relevant items, statuses, actions, and non-sensitive failures in `tapd_reply_items`.
+9. Compose the original task result, then append exactly one compact TAPD footer as the last user-readable block. After the first footer, perform the one-time mode transition defined by the first-answer rules. After a later explicitly reactivated footer without a verified binding, return to `dormant` unless one specific user choice is still required for that same parent operation.
 
 Build the footer according to the current state:
 
