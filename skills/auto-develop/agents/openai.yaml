@@ -1,6 +1,6 @@
 interface:
   display_name: "Auto Develop"
   short_description: "Run session-long delivery with phase tracking"
-  default_prompt: "Use $auto-develop to keep autonomous delivery active for this session through reviewed draft PRs, synchronize configured project-management tracking across every delivery phase, persist each decision in a Git-ignored private {task-summary}-decision-tree.md, and report its absolute path with the complete decision tree."
+  default_prompt: "Use $auto-develop to keep autonomous delivery active for this session through reviewed draft PRs, synchronize configured project-management tracking across every delivery phase, persist fixed-shape decision objects in a Git-ignored private {task-summary}-decision-tree.json, update exactly one object by immutable ID with parsed read-back, report the absolute ledger path, and render the complete decision tree in the session language."
 policy:
   allow_implicit_invocation: false

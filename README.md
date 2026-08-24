@@ -134,9 +134,9 @@ npx skills add roxi3906/the-way-of-roxi --list
 - Reuses configured workflows, task synchronization, and progress monitoring; a unique match at or above 90% can be bound automatically
 - Makes recommended low-risk decisions while pausing only for indispensable user actions or material risk
 - Deeply reviews the completed diff, fixes every actionable in-scope recommendation, revalidates, and re-reviews
-- Appends every material decision and verified outcome to `{task-summary}-decision-tree.md` in a Git-ignored, agent-owned private planning directory
+- Stores every material decision in a fixed-shape object inside `{task-summary}-decision-tree.json`, then locates that object by its immutable ID for later updates
 - Restores the durable ledger before acting in a resumed or context-restored session
-- Reports the verified delivery with the private decision-tree path and a complete tree reconciled against the ledger
+- Reports the verified delivery with the private JSON decision-tree path and a complete tree rendered in the current session language
 - Reminds the user that local worktree and branch cleanup can be requested after merge; cleanup is outside this Skill
 
 `roxis-way` defines defaults for:
