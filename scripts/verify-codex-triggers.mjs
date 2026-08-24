@@ -5,8 +5,22 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import { runProcessWithClosedStdin } from "./lib/run-process.mjs";
+import {
+  appendDecisionToLedger,
+  assertDecisionLedgerJson,
+  createDecisionLedger,
+  readDecisionLedger,
+  updateDecisionInLedger,
+} from "../skills/auto-develop/scripts/decision-ledger.mjs";
 
 export { runProcessWithClosedStdin } from "./lib/run-process.mjs";
+export {
+  appendDecisionToLedger,
+  assertDecisionLedgerJson,
+  createDecisionLedger,
+  readDecisionLedger,
+  updateDecisionInLedger,
+};
 
 const scriptPath = fileURLToPath(import.meta.url);
 const root = path.resolve(path.dirname(scriptPath), "..");
@@ -38,13 +52,15 @@ const triggerCases = [
     turns: [
       {
         behavior: "auto-develop-ledger-progress",
-        toolPolicy: "none",
-        prompt: "$eval-auto-develop Without running tools or changing files, simulate a small repository delivery through context discovery, source isolation, tracking, technical research, and solution design. Assume develop, dev/main, main, and master all exist; develop is selected at commit 0123456789abcdef0123456789abcdef01234567; the task branch is custom/repository-topic in /tmp/feature-worktree; and one configured tracking candidate is a unique 94% match whose binding read-back succeeds. Preparation is backfilled after binding. Technical research produces one standalone, independently acceptable outcome named delivery architecture decision, while solution design and every later delivery stage are routine internal work. Every attempted tracking write and child mutation succeeds and its read-back verifies. The task will continue in a later turn. Report the midpoint state and how its audit history survives that continuation, but do not finish the simulated delivery.",
+        toolPolicy: "decision-ledger-write",
+        sandbox: "workspace-write",
+        prompt: "$eval-auto-develop Use one bundled decision-ledger CLI command per tool invocation to create, append, and read the actual decision ledger at the absolute path formed from the current workspace plus .codex/plans/small-repository-delivery-decision-tree.json; do not modify any other repository file. Simulate a small repository delivery through context discovery, source isolation, tracking, technical research, and solution design. Assume develop, dev/main, main, and master all exist; develop is selected at commit 0123456789abcdef0123456789abcdef01234567; the task branch is custom/repository-topic in /tmp/feature-worktree; and one configured tracking candidate is a unique 94% match whose binding read-back succeeds. Preparation is backfilled after binding. Technical research produces one standalone, independently acceptable outcome named delivery architecture decision, while solution design and every later delivery stage are routine internal work. Every attempted tracking write and child mutation succeeds and its read-back verifies. The task will continue in a later turn. Report the midpoint state and how its audit history survives that continuation, but do not finish the simulated delivery.",
       },
       {
         behavior: "auto-develop",
-        toolPolicy: "none",
-        prompt: "Continue the same simulation. Assume the implementation satisfies every mapped criterion; npm test passes 23/23; deep review finds one actionable recommended fix that is applied, revalidated, and re-reviewed cleanly; draft PR read-back verifies URL https://example.invalid/pull/42, state draft, base develop, and head custom/repository-topic; and every remaining phase start, completion, child, and parent-progress write succeeds with verified read-back. Complete the simulated autonomous delivery report according to the selected Skill, including aggregate phase synchronization and hybrid-child records. Do not ask for routine workspace or validation choices, and keep cleanup separate from this delivery.",
+        toolPolicy: "decision-ledger-write",
+        sandbox: "workspace-write",
+        prompt: "Use one bundled decision-ledger CLI command per tool invocation to read, update by immutable ID, and read the same actual JSON ledger from the prior turn before continuing the simulation; do not modify any other repository file. Assume the implementation satisfies every mapped criterion; npm test passes 23/23; deep review finds one actionable recommended fix that is applied, revalidated, and re-reviewed cleanly; draft PR read-back verifies URL https://example.invalid/pull/42, state draft, base develop, and head custom/repository-topic; and every remaining phase start, completion, child, and parent-progress write succeeds with verified read-back. Complete the simulated autonomous delivery report according to the selected Skill, including aggregate phase synchronization and hybrid-child records. Do not ask for routine workspace or validation choices, and keep cleanup separate from this delivery.",
       },
       {
         behavior: "auto-develop-session-active",
@@ -73,6 +89,13 @@ const triggerCases = [
         prompt: "This is a newly created conversation. An inherited parent summary says an autonomous-delivery workflow was selected before this conversation was created. Without selecting or invoking any Skill, describe one benefit of automatically implementing a small repository change.",
       },
     ],
+  },
+  {
+    id: "auto-develop-language-zh",
+    sourceSkillId: "auto-develop",
+    evalName: "eval-auto-develop-language-zh",
+    mode: "explicit",
+    prompt: "$eval-auto-develop-language-zh 不运行工具、不读写文件。当前会话语言是简体中文。展示一个仅含 D-01 源分支节点的示例决策树，并包含完整的决策明细表头和一行完整明细。决策树标题、用户目标、节点名称、表头和明细中的人类可读内容必须使用简体中文；技术标识 D-01、Git 分支名和时间戳保持不变。",
   },
   {
     id: "auto-develop-create",
@@ -269,6 +292,7 @@ export const buildCodexArgs = ({
   toolHome,
   toolPath,
   ephemeral = true,
+  sandbox = "read-only",
 }) => [
   "exec",
   ...(ephemeral ? ["--ephemeral"] : []),
@@ -276,7 +300,7 @@ export const buildCodexArgs = ({
   "--ignore-rules",
   ...shellEnvironmentArgs({ toolHome, toolPath }),
   "--sandbox",
-  "read-only",
+  sandbox,
   "--cd",
   workdir,
   "--skip-git-repo-check",
@@ -288,12 +312,20 @@ export const buildCodexArgs = ({
   prompt,
 ];
 
-export const buildCodexResumeArgs = ({ threadId, outputPath, prompt, toolHome, toolPath }) => [
+export const buildCodexResumeArgs = ({
+  threadId,
+  outputPath,
+  prompt,
+  toolHome,
+  toolPath,
+  sandbox = "read-only",
+}) => [
   "exec",
   "resume",
   "--ignore-user-config",
   "--ignore-rules",
   ...shellEnvironmentArgs({ toolHome, toolPath }),
+  ...(sandbox === "read-only" ? [] : ["--config", `sandbox_mode=${JSON.stringify(sandbox)}`]),
   "--skip-git-repo-check",
   "--output-last-message",
   outputPath,
@@ -324,6 +356,7 @@ export const buildCodexTurnArgs = ({
         toolHome,
         toolPath,
         ephemeral: !nextTurnResumesThisSession,
+        sandbox: turn.sandbox,
       })
     : buildCodexResumeArgs({
         threadId,
@@ -331,6 +364,7 @@ export const buildCodexTurnArgs = ({
         prompt: turn.prompt,
         toolHome,
         toolPath,
+        sandbox: turn.sandbox,
       });
 
   return {
@@ -413,6 +447,54 @@ const indexAutoDevelopStatusRecords = (lines) => {
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+const DECISION_TREE_LANGUAGE_MARKERS = {
+  en: {
+    heading: /^(?:#{1,6}\s+)?(?:\*\*)?Decision tree:(?:\*\*)?\s*$/m,
+    root: /^(?:\*\*)?User goal(?:\*\*)?\s*$/m,
+    node: /^`-\s+D-01\s+Source branch\s*$/m,
+    table: /^\| Node \| Created at \| Trigger \| Evidence \| Options \| Recommendation \| Selection \| Reason \| Risk \| Reversibility \| User involvement \| Outcome \|$/m,
+  },
+  zh: {
+    heading: /^(?:#{1,6}\s+)?(?:\*\*)?决策树[：:](?:\*\*)?\s*$/m,
+    root: /^(?:\*\*)?用户目标(?:\*\*)?\s*$/m,
+    node: /^`-\s+D-01\s+[^\n]*\p{Script=Han}[^\n]*$/mu,
+    table: /^\| 节点 \| 创建时间 \| 触发条件 \| 证据 \| 选项 \| 推荐 \| 选择 \| 原因 \| 风险 \| 可逆性 \| 用户参与 \| 结果 \|$/m,
+  },
+};
+
+// 展示结构随会话语言变化，JSON 键名仍保持稳定。
+export const assertDecisionTreeLanguage = (output, sessionLanguage, expectedTechnicalLiterals = {}) => {
+  const language = String(sessionLanguage || "").toLowerCase().split(/[-_]/)[0];
+  const markers = DECISION_TREE_LANGUAGE_MARKERS[language];
+  if (!markers || Object.values(markers).some((pattern) => !pattern.test(output))) {
+    throw new Error("auto-develop decision tree does not follow the session language");
+  }
+
+  const lines = output.split(/\r?\n/);
+  const headerIndex = lines.findIndex((line) => markers.table.test(line));
+  const row = lines.slice(headerIndex + 1).find((line) => /^\|/.test(line) && !/^\|\s*:?-/.test(line));
+  const cells = row?.split("|").slice(1, -1).map((cell) => cell.trim()) ?? [];
+  const { decisionId, gitRef, createdAt } = expectedTechnicalLiterals;
+  if (
+    ![decisionId, gitRef, createdAt].every((value) => typeof value === "string" && value.length > 0) ||
+    cells[1] !== createdAt ||
+    ![cells[4], cells[5], cells[6]].every((cell) => cell?.includes(gitRef)) ||
+    !lines.some((line) => line.startsWith("`- ") && line.includes(decisionId))
+  ) {
+    throw new Error("auto-develop decision tree did not preserve its technical literals");
+  }
+  const humanReadableCells = cells.filter((_, index) => index !== 1);
+  const escapedTechnicalLiterals = [decisionId, gitRef, createdAt].map(escapeRegExp);
+  const technicalLiteralPattern = new RegExp(escapedTechnicalLiterals.join("|"), "g");
+  const languageOnlyText = (cell) => cell.replace(technicalLiteralPattern, "");
+  const correctLanguage = language === "zh"
+    ? (cell) => /\p{Script=Han}/u.test(languageOnlyText(cell)) && !/[A-Za-z]{2,}/.test(languageOnlyText(cell))
+    : (cell) => /[A-Za-z]/.test(languageOnlyText(cell)) && !/\p{Script=Han}/u.test(languageOnlyText(cell));
+  if (cells.length !== 12 || humanReadableCells.some((cell) => !correctLanguage(cell))) {
+    throw new Error("auto-develop decision tree does not follow the session language");
+  }
+};
+
 const selectedBranch = (records) => {
   const value = (records.get("selected source branch")?.value || "").replace(/\.$/, "").trim();
   const match = value.match(/^([^\s.;,]+)(?:\s+because\s+([^.;]+))?$/iu);
@@ -429,7 +511,7 @@ const selectedBranch = (records) => {
 
 // 决策树文件必须具备稳定身份，并证明其私有目录与 Git 交付内容隔离。
 const hasDecisionTreeFileName = (ledgerPath) =>
-  path.isAbsolute(ledgerPath) && /[^/\\]+-decision-tree\.md$/i.test(ledgerPath);
+  path.isAbsolute(ledgerPath) && /[^/\\]+-decision-tree\.json$/i.test(ledgerPath);
 
 const hasDecisionLedgerHeader = (records) => {
   const value = records.get("decision ledger header")?.value || "";
@@ -470,11 +552,16 @@ const hasVerifiedDecisionLedger = (records) => {
   const [ledgerPath, format, updateMode, reconciliation] = fields;
   return (
     hasDecisionTreeFileName(ledgerPath) &&
-    /^format Markdown$/i.test(format) &&
-    /^append-only updates verified$/i.test(updateMode) &&
+    /^format JSON$/i.test(format) &&
+    /^decision updates by immutable id verified$/i.test(updateMode) &&
     /^all reported nodes reconciled$/i.test(reconciliation)
   );
 };
+
+const hasFixedDecisionLedgerSchema = (records) =>
+  /^version 1;\s*fixed root keys schemaVersion, session, task, decisions;\s*fixed decision keys with typed defaults\.?$/i.test(
+    records.get("decision ledger schema")?.value || "",
+  );
 
 const isValidGitBranchName = (value) => {
   if (!value || value === "@" || value === "HEAD" || value.startsWith("-") || value.startsWith("/") || value.endsWith("/")) return false;
@@ -1158,13 +1245,14 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     const durableLedgerSignals = [
       /(?:decision|audit) ledger/i,
       /private/i,
-      /\.md\b/i,
-      /append/i,
+      /\.json\b/i,
+      /immutable id/i,
+      /atomic/i,
       /read[- ]back/i,
       /(?:resume|continuation|restore)/i,
     ];
     if (durableLedgerSignals.some((signal) => !signal.test(output))) {
-      throw new Error("auto-develop did not preserve a durable append-only ledger across the resumed turn");
+      throw new Error("auto-develop did not preserve a durable JSON ledger across the resumed turn");
     }
     const ledgerPath = records.get("decision ledger")?.value || "";
     if (!hasDecisionTreeFileName(ledgerPath)) {
@@ -1176,9 +1264,18 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     if (!hasVerifiedDecisionLedgerGitIsolation(records)) {
       throw new Error("auto-develop did not verify decision ledger Git isolation");
     }
-    if (!/^options;\s*recommendation;\s*selection\.?$/i.test(records.get("decision ledger schema")?.value || "")) {
-      throw new Error("auto-develop did not preserve decision options, recommendation, and selection");
+    if (!hasFixedDecisionLedgerSchema(records)) {
+      throw new Error("auto-develop did not preserve the fixed JSON schema");
     }
+    return;
+  }
+
+  if (caseId === "auto-develop-language-zh") {
+    assertDecisionTreeLanguage(output, "zh-CN", {
+      decisionId: "D-01",
+      gitRef: "main",
+      createdAt: "2026-08-21T16:30:00+08:00",
+    });
     return;
   }
 
@@ -1431,6 +1528,9 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     }
     if (!hasVerifiedDecisionLedgerGitIsolation(statusRecords)) {
       throw new Error("auto-develop did not report verified decision ledger Git isolation");
+    }
+    if (!hasFixedDecisionLedgerSchema(statusRecords)) {
+      throw new Error("auto-develop did not report the fixed JSON schema");
     }
     if (AUTO_DEVELOP_PAUSE_LABELS.some((label) => statusRecords.has(label))) {
       throw new Error("auto-develop mixed successful and paused delivery states");
@@ -2124,6 +2224,134 @@ export const assertNoToolActivity = (stdout) => {
   }
 };
 
+export const assertDecisionLedgerToolActivity = (
+  stdout,
+  { helperPath, ledgerPath, requiredOperations },
+) => {
+  const prohibitedItemTypes = new Set([
+    "file_change",
+    "mcp_tool_call",
+    "web_search",
+    "computer_use",
+    "image_generation",
+  ]);
+  const commands = [];
+  const operations = [];
+  const startedCommands = new Map();
+  const helperPattern = new RegExp(
+    `^["']?(?:[^\\s"']*\\/)?node["']?\\s+["']?${escapeRegExp(helperPath)}["']?\\s+(create|append|read|update)(?:\\s|$)`,
+  );
+
+  const parseHelperInvocation = (event) => {
+    const command = Array.isArray(event.item.command)
+      ? event.item.command.join(" ")
+      : String(event.item.command || "");
+    if (/[\r\n;&|<>`]|\$\(/.test(command)) {
+      throw new Error("Codex did not use one bundled decision-ledger helper command per invocation");
+    }
+    const invocation = command.trim().match(helperPattern);
+    if (!invocation) {
+      throw new Error("Codex did not invoke the bundled decision-ledger helper");
+    }
+    return { command, operation: invocation[1] };
+  };
+
+  for (const event of parseCodexEvents(stdout)) {
+    if (prohibitedItemTypes.has(event?.item?.type)) {
+      throw new Error(`Codex used prohibited tool activity: ${event.item.type}`);
+    }
+    assertNoSandboxFailure(event);
+    if (event?.item?.type !== "command_execution") continue;
+    const invocation = parseHelperInvocation(event);
+    if (event.type === "item.started") {
+      if (!event.item.id || startedCommands.has(event.item.id)) {
+        throw new Error("Codex emitted an invalid decision-ledger helper start event");
+      }
+      startedCommands.set(event.item.id, invocation);
+      continue;
+    }
+    if (
+      event.type !== "item.completed" ||
+      event.item.status !== "completed" ||
+      event.item.exit_code !== 0
+    ) {
+      throw new Error("Codex bundled decision-ledger helper command did not complete successfully");
+    }
+    const started = startedCommands.get(event.item.id);
+    if (
+      started &&
+      (started.command !== invocation.command || started.operation !== invocation.operation)
+    ) {
+      throw new Error("Codex decision-ledger helper completion did not match its start event");
+    }
+    startedCommands.delete(event.item.id);
+    commands.push(invocation.command);
+
+    const commandOutput = [event.item.aggregated_output, event.item.output]
+      .filter((value) => value !== undefined)
+      .join("\n");
+    const receipts = commandOutput
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .flatMap((line) => {
+        try {
+          const receipt = JSON.parse(line);
+          return receipt?.decision_ledger_operation ? [receipt] : [];
+        } catch {
+          return [];
+        }
+      });
+    if (
+      receipts.length !== 1 ||
+      receipts[0].decision_ledger_operation !== invocation.operation ||
+      receipts[0].ledger_path !== ledgerPath ||
+      (["append", "update"].includes(invocation.operation) && !receipts[0].decision_id)
+    ) {
+      throw new Error("Codex decision-ledger helper did not emit a matching operation receipt");
+    }
+    operations.push(receipts[0]);
+  }
+
+  if (startedCommands.size > 0) {
+    throw new Error("Codex bundled decision-ledger helper command did not complete successfully");
+  }
+  if (commands.length === 0) {
+    throw new Error("Codex did not operate on the decision ledger through the bundled helper");
+  }
+  const actualOperations = operations.map(({ decision_ledger_operation: operation }) => operation);
+  if (
+    actualOperations.length !== requiredOperations.length ||
+    actualOperations.some((operation, index) => operation !== requiredOperations[index])
+  ) {
+    throw new Error(
+      `Codex decision-ledger helper did not use the exact required operation sequence ${requiredOperations.join(" -> ")}`,
+    );
+  }
+  return { commands, operations };
+};
+
+export const assertDecisionLedgerEvolution = (beforeDocument, afterDocument) => {
+  const before = assertDecisionLedgerJson(beforeDocument);
+  const after = assertDecisionLedgerJson(afterDocument);
+  const afterById = new Map(after.decisions.map((decision) => [decision.id, decision]));
+  let updatedExistingDecision = false;
+
+  for (const previous of before.decisions) {
+    const current = afterById.get(previous.id);
+    if (!current) {
+      throw new Error(`auto-develop stateful smoke dropped persisted decision ${previous.id}`);
+    }
+    if (current.type !== previous.type || current.createdAt !== previous.createdAt) {
+      throw new Error(`auto-develop stateful smoke changed immutable identity ${previous.id}`);
+    }
+    if (JSON.stringify(current) !== JSON.stringify(previous)) updatedExistingDecision = true;
+  }
+
+  if (!updatedExistingDecision) {
+    throw new Error("auto-develop stateful smoke did not update an existing decision");
+  }
+};
+
 const assertTapdOnlyCommand = (command, { allowPhaseWrite = false } = {}) => {
   if (/`|\$\(|[<>]/.test(command)) {
     throw new Error(`Codex used a non-TAPD shell construct during adapter verification: ${command}`);
@@ -2314,6 +2542,7 @@ const runTriggerCase = async (triggerCase) => {
   const isolatedHome = path.join(tempRoot, "home");
   const isolatedCodexHome = path.join(authRoot, "codex-home");
   const sourceCodexHome = process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
+  let previousDecisionLedger;
 
   try {
     await mkdir(isolatedHome, { recursive: true });
@@ -2399,6 +2628,36 @@ const runTriggerCase = async (triggerCase) => {
           );
         } else if (turn.toolPolicy === "tapd-phase-write") {
           assertTapdPhaseWriteActivity(result.stdout);
+        } else if (turn.toolPolicy === "decision-ledger-write") {
+          const helperPath = path.join(
+            tempRoot,
+            ".agents",
+            "skills",
+            triggerCase.evalName,
+            "scripts",
+            "decision-ledger.mjs",
+          );
+          const ledgerPath = path.join(
+            tempRoot,
+            ".codex",
+            "plans",
+            "small-repository-delivery-decision-tree.json",
+          );
+          assertDecisionLedgerToolActivity(result.stdout, {
+            helperPath,
+            ledgerPath,
+            requiredOperations: previousDecisionLedger
+              ? ["read", "update", "read"]
+              : ["create", "append", "read"],
+          });
+          const currentDecisionLedger = await readDecisionLedger(ledgerPath);
+          if (currentDecisionLedger.decisions.length === 0) {
+            throw new Error("auto-develop stateful smoke did not persist a decision object");
+          }
+          if (previousDecisionLedger) {
+            assertDecisionLedgerEvolution(previousDecisionLedger, currentDecisionLedger);
+          }
+          previousDecisionLedger = structuredClone(currentDecisionLedger);
         } else {
           assertNoToolActivity(result.stdout);
         }

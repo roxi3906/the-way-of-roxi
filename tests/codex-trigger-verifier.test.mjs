@@ -105,6 +105,16 @@ test("Codex trigger runs are isolated and can persist only for lifecycle verific
   });
   assert.ok(!persistent.includes("--ephemeral"));
 
+  const writable = buildCodexArgs({
+    workdir: "/tmp/fresh-repo",
+    outputPath: "/tmp/fresh-repo/writable.txt",
+    prompt: "Maintain the real decision ledger.",
+    toolHome: "/tmp/fresh-repo/home",
+    toolPath: "/usr/bin:/bin",
+    sandbox: "workspace-write",
+  });
+  assert.equal(writable[writable.indexOf("--sandbox") + 1], "workspace-write");
+
   assert.deepEqual(
     buildCodexResumeArgs({
       threadId: "019fc5b7-286f-73c2-b9cf-d0401e5a465e",
@@ -130,6 +140,15 @@ test("Codex trigger runs are isolated and can persist only for lifecycle verific
       "Continue the lifecycle check.",
     ],
   );
+  const writableResume = buildCodexResumeArgs({
+    threadId: "019fc5b7-286f-73c2-b9cf-d0401e5a465e",
+    outputPath: "/tmp/fresh-repo/second.txt",
+    prompt: "Reopen and update the decision ledger.",
+    toolHome: "/tmp/fresh-repo/home",
+    toolPath: "/tmp/fake-bin:/usr/bin:/bin",
+    sandbox: "workspace-write",
+  });
+  assert.ok(writableResume.includes('sandbox_mode="workspace-write"'));
 
   const lifecycleTurns = [
     { prompt: "Start the active session." },
@@ -170,15 +189,15 @@ test("Codex trigger runs are isolated and can persist only for lifecycle verific
   assert.ok(!freshTurn.args.includes("active-thread"));
 });
 
-test("Auto Develop midpoint evidence survives a resumed turn in a private append-only ledger", async () => {
+test("Auto Develop midpoint evidence survives a resumed turn in a private JSON ledger", async () => {
   const { assertTriggerBehavior } = await loadVerifier();
   const checkpoint = [
     "SKILL_ACTIVATED: eval-auto-develop",
-    "Decision ledger: /tmp/feature-worktree/.codex/plans/small-repository-delivery-decision-tree.md",
+    "Decision ledger: /tmp/feature-worktree/.codex/plans/small-repository-delivery-decision-tree.json",
     "Decision ledger header: session ID session-42; session name Small repository delivery; task summary Deliver a small repository change.",
     "Decision ledger Git state: agent-private directory .codex/plans; ignored; untracked; excluded from commits.",
-    "Decision ledger schema: options; recommendation; selection.",
-    "The private Markdown ledger uses append-only records with read-back verification.",
+    "Decision ledger schema: version 1; fixed root keys schemaVersion, session, task, decisions; fixed decision keys with typed defaults.",
+    "The private JSON ledger parses successfully; each update locates one existing decisions entry by immutable id, rewrites it atomically, and verifies the read-back.",
     "The same ledger is read before the resumed continuation.",
   ];
 
@@ -193,10 +212,10 @@ test("Auto Develop midpoint evidence survives a resumed turn in a private append
     () =>
       assertTriggerBehavior(
         "auto-develop-ledger-progress",
-        checkpoint.filter((line) => !/append-only/i.test(line)).join("\n"),
+        checkpoint.filter((line) => !/immutable id/i.test(line)).join("\n"),
         "eval-auto-develop",
       ),
-    /durable append-only ledger/,
+    /durable JSON ledger/,
   );
 });
 
@@ -204,22 +223,22 @@ test("Auto Develop requires the decision ledger identity and Git isolation evide
   const { assertTriggerBehavior } = await loadVerifier();
   const checkpoint = [
     "SKILL_ACTIVATED: eval-auto-develop",
-    "Decision ledger: /tmp/feature-worktree/.codex/plans/small-repository-delivery-decision-tree.md",
+    "Decision ledger: /tmp/feature-worktree/.codex/plans/small-repository-delivery-decision-tree.json",
     "Decision ledger header: session ID session-42; session name Small repository delivery; task summary Deliver a small repository change.",
     "Decision ledger Git state: agent-private directory .codex/plans; ignored; untracked; excluded from commits.",
-    "Decision ledger schema: options; recommendation; selection.",
-    "The private Markdown ledger uses append-only records with read-back verification.",
+    "Decision ledger schema: version 1; fixed root keys schemaVersion, session, task, decisions; fixed decision keys with typed defaults.",
+    "The private JSON ledger parses successfully; each update locates one existing decisions entry by immutable id, rewrites it atomically, and verifies the read-back.",
     "The same ledger is read before the resumed continuation.",
   ];
 
   for (const [mutation, expectedError] of [
     [
-      (line) => line.replace("small-repository-delivery-decision-tree.md", "small-repository-delivery.md"),
+      (line) => line.replace("small-repository-delivery-decision-tree.json", "small-repository-delivery.json"),
       /decision-tree file name/,
     ],
     [(line) => line.startsWith("Decision ledger header:") ? undefined : line, /session metadata/],
     [(line) => line.startsWith("Decision ledger Git state:") ? undefined : line, /Git isolation/],
-    [(line) => line.startsWith("Decision ledger schema:") ? undefined : line, /decision options, recommendation, and selection/],
+    [(line) => line.startsWith("Decision ledger schema:") ? undefined : line, /fixed JSON schema/],
   ]) {
     assert.throws(
       () =>
@@ -231,6 +250,394 @@ test("Auto Develop requires the decision ledger identity and Git isolation evide
       expectedError,
     );
   }
+});
+
+test("Auto Develop decision ledgers use one fixed JSON shape with typed defaults", async () => {
+  const { assertDecisionLedgerJson } = await loadVerifier();
+  const pendingDecision = {
+    id: "D-01",
+    type: "source_branch",
+    title: "Source branch",
+    createdAt: "2026-08-21T16:30:00+08:00",
+    parentId: "",
+    trigger: "Choose the delivery base",
+    evidence: ["Repository branch inspection"],
+    options: [
+      {
+        id: "option-1",
+        label: "main",
+        description: "Use the repository default branch",
+        recommended: true,
+      },
+    ],
+    recommendation: "option-1",
+    selection: "option-1",
+    reason: "The repository has no integration branch",
+    risk: {
+      level: "low",
+      description: "The task remains isolated in a worktree",
+    },
+    reversibility: "Delete the task worktree after merge",
+    userInvolvement: "authorized by invocation",
+    outcome: {
+      status: "",
+      evidence: [],
+      updatedAt: "",
+    },
+  };
+  const ledger = {
+    schemaVersion: 1,
+    session: {
+      id: "session-42",
+      name: "Small repository delivery",
+      language: "en",
+    },
+    task: {
+      summary: "Deliver a small repository change",
+      ledgerPath: "/tmp/feature-worktree/.codex/plans/small-repository-delivery-decision-tree.json",
+    },
+    decisions: [pendingDecision],
+  };
+
+  assert.doesNotThrow(() => assertDecisionLedgerJson(ledger));
+  assert.throws(
+    () => assertDecisionLedgerJson({ ...ledger, decisions: [{ ...pendingDecision, outcome: undefined }] }),
+    /fixed decision keys/,
+  );
+  assert.throws(
+    () => assertDecisionLedgerJson({
+      ...ledger,
+      decisions: [{ ...pendingDecision, outcome: { status: "", evidence: "", updatedAt: "" } }],
+    }),
+    /typed decision defaults/,
+  );
+  assert.throws(
+    () => assertDecisionLedgerJson({ ...ledger, decisions: [{ ...pendingDecision, id: "" }] }),
+    /decision identity/,
+  );
+  assert.throws(
+    () => assertDecisionLedgerJson({ ...ledger, decisions: [{ ...pendingDecision, id: "   " }] }),
+    /decision identity/,
+  );
+  assert.throws(
+    () => assertDecisionLedgerJson({ ...ledger, decisions: [{ ...pendingDecision, options: "" }] }),
+    /typed decision defaults/,
+  );
+  assert.throws(
+    () => assertDecisionLedgerJson({
+      ...ledger,
+      decisions: [{
+        ...pendingDecision,
+        options: pendingDecision.options.map((option) => ({ ...option, recommended: false })),
+      }],
+    }),
+    /recommended option/,
+  );
+  assert.throws(
+    () => assertDecisionLedgerJson({
+      ...ledger,
+      decisions: [{ ...pendingDecision, recommendation: "missing-option" }],
+    }),
+    /option references/,
+  );
+  assert.throws(
+    () => assertDecisionLedgerJson({
+      ...ledger,
+      decisions: [{
+        ...pendingDecision,
+        options: [{ ...pendingDecision.options[0], id: "   " }],
+        recommendation: "   ",
+        selection: "   ",
+      }],
+    }),
+    /option identities/,
+  );
+});
+
+test("Auto Develop reopens JSON ledgers and updates exactly one decision by immutable id", async () => {
+  const {
+    appendDecisionToLedger,
+    createDecisionLedger,
+    readDecisionLedger,
+    updateDecisionInLedger,
+  } = await loadVerifier();
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "auto-develop-ledger-"));
+  const ledgerPath = path.join(tempRoot, "small-repository-delivery-decision-tree.json");
+  const sourceDecision = {
+    id: "D-01",
+    type: "source_branch",
+    title: "Source branch",
+    createdAt: "2026-08-21T16:30:00+08:00",
+    parentId: "",
+    trigger: "Choose the delivery base",
+    evidence: ["Repository branch inspection"],
+    options: [{
+      id: "option-1",
+      label: "main",
+      description: "Use the repository default branch",
+      recommended: true,
+    }],
+    recommendation: "option-1",
+    selection: "option-1",
+    reason: "The repository has no integration branch",
+    risk: { level: "low", description: "The task remains isolated" },
+    reversibility: "Change the base before delivery",
+    userInvolvement: "authorized by invocation",
+    outcome: { status: "", evidence: [], updatedAt: "" },
+  };
+  const worktreeDecision = {
+    ...sourceDecision,
+    id: "D-02",
+    type: "worktree",
+    title: "Worktree",
+    createdAt: "2026-08-21T16:31:00+08:00",
+  };
+
+  try {
+    await createDecisionLedger({
+      ledgerPath,
+      session: { id: "session-42", name: "Small delivery", language: "en" },
+      taskSummary: "Deliver a small repository change",
+    });
+    await appendDecisionToLedger(ledgerPath, sourceDecision);
+    await appendDecisionToLedger(ledgerPath, worktreeDecision);
+    const beforeUpdate = await readDecisionLedger(ledgerPath);
+
+    await updateDecisionInLedger(ledgerPath, "D-01", {
+      outcome: {
+        status: "Base recorded",
+        evidence: ["main exists at the recorded commit"],
+        updatedAt: "2026-08-21T16:32:00+08:00",
+      },
+    });
+    const reopened = await readDecisionLedger(ledgerPath);
+
+    assert.equal(reopened.decisions.length, 2);
+    assert.deepEqual(reopened.decisions[1], beforeUpdate.decisions[1]);
+    assert.equal(reopened.decisions[0].id, "D-01");
+    assert.equal(reopened.decisions[0].createdAt, sourceDecision.createdAt);
+    assert.deepEqual(reopened.decisions[0].outcome, {
+      status: "Base recorded",
+      evidence: ["main exists at the recorded commit"],
+      updatedAt: "2026-08-21T16:32:00+08:00",
+    });
+    assert.deepEqual(await readdir(tempRoot), [path.basename(ledgerPath)]);
+    await assert.rejects(
+      updateDecisionInLedger(ledgerPath, "D-99", { reason: "missing" }),
+      /exactly one decision/,
+    );
+    await assert.rejects(
+      updateDecisionInLedger(ledgerPath, "D-01", { id: "D-03" }),
+      /immutable/,
+    );
+    await assert.rejects(
+      appendDecisionToLedger(ledgerPath, sourceDecision),
+      /already contains decision D-01/,
+    );
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("Auto Develop serializes concurrent updates without losing another decision", async () => {
+  const {
+    appendDecisionToLedger,
+    createDecisionLedger,
+    readDecisionLedger,
+    updateDecisionInLedger,
+  } = await loadVerifier();
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "auto-develop-ledger-concurrent-"));
+  const ledgerPath = path.join(tempRoot, "concurrent-delivery-decision-tree.json");
+  const makeDecision = (id, type, title, createdAt) => ({
+    id,
+    type,
+    title,
+    createdAt,
+    parentId: "",
+    trigger: "Record a material decision",
+    evidence: [],
+    options: [],
+    recommendation: "",
+    selection: "",
+    reason: "",
+    risk: { level: "", description: "" },
+    reversibility: "",
+    userInvolvement: "",
+    outcome: { status: "", evidence: [], updatedAt: "" },
+  });
+
+  try {
+    await createDecisionLedger({
+      ledgerPath,
+      session: { id: "session-42", name: "Concurrent delivery", language: "en" },
+      taskSummary: "Preserve concurrent decision updates",
+    });
+    await appendDecisionToLedger(
+      ledgerPath,
+      makeDecision("D-01", "source_branch", "Source branch", "2026-08-21T16:30:00+08:00"),
+    );
+    await appendDecisionToLedger(
+      ledgerPath,
+      makeDecision("D-02", "worktree", "Worktree", "2026-08-21T16:31:00+08:00"),
+    );
+
+    await Promise.all([
+      updateDecisionInLedger(ledgerPath, "D-01", { reason: "main is the verified source" }),
+      updateDecisionInLedger(ledgerPath, "D-02", { reason: "the task uses an isolated worktree" }),
+    ]);
+    const reopened = await readDecisionLedger(ledgerPath);
+
+    assert.equal(reopened.decisions.find(({ id }) => id === "D-01")?.reason, "main is the verified source");
+    assert.equal(
+      reopened.decisions.find(({ id }) => id === "D-02")?.reason,
+      "the task uses an isolated worktree",
+    );
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("Auto Develop rejects a reopened ledger whose recorded path does not match the file", async () => {
+  const { createDecisionLedger, readDecisionLedger } = await loadVerifier();
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "auto-develop-ledger-identity-"));
+  const ledgerPath = path.join(tempRoot, "identity-decision-tree.json");
+
+  try {
+    const ledger = await createDecisionLedger({
+      ledgerPath,
+      session: { id: "session-42", name: "Identity check", language: "en" },
+      taskSummary: "Reject a moved ledger identity",
+    });
+    ledger.task.ledgerPath = path.join(tempRoot, "other-decision-tree.json");
+    await writeFile(ledgerPath, `${JSON.stringify(ledger, null, 2)}\n`);
+
+    await assert.rejects(readDecisionLedger(ledgerPath), /ledger path identity/);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("Auto Develop renders the decision tree in the session language", async () => {
+  const { assertDecisionTreeLanguage } = await loadVerifier();
+  const chineseTree = [
+    "决策树：",
+    "用户目标",
+    "`- D-01 源分支",
+    "| 节点 | 创建时间 | 触发条件 | 证据 | 选项 | 推荐 | 选择 | 原因 | 风险 | 可逆性 | 用户参与 | 结果 |",
+    "| 源分支 | 2026-08-21T16:30:00+08:00 | 开始交付 | 分支检查 | 1. main - 使用默认分支 [推荐] | 选项 1 - main | 选项 1 - main | 默认分支可用 | 低风险 | 可更改目标分支 | 已由调用授权 | 已记录基础版本 |",
+  ].join("\n");
+  const expectedTechnicalLiterals = {
+    decisionId: "D-01",
+    gitRef: "main",
+    createdAt: "2026-08-21T16:30:00+08:00",
+  };
+
+  assert.doesNotThrow(() => assertDecisionTreeLanguage(chineseTree, "zh-CN", expectedTechnicalLiterals));
+  assert.throws(
+    () => assertDecisionTreeLanguage(
+      chineseTree.replace("决策树：", "Decision tree:"),
+      "zh-CN",
+      expectedTechnicalLiterals,
+    ),
+    /session language/,
+  );
+  assert.throws(
+    () => assertDecisionTreeLanguage(
+      chineseTree.replace("D-01 源分支", "D-01 Source branch"),
+      "zh-CN",
+      expectedTechnicalLiterals,
+    ),
+    /session language/,
+  );
+  assert.throws(
+    () => assertDecisionTreeLanguage(
+      chineseTree.replace("`- D-01 源分支\n", ""),
+      "zh-CN",
+      expectedTechnicalLiterals,
+    ),
+    /session language/,
+  );
+  assert.throws(
+    () => assertDecisionTreeLanguage(
+      chineseTree.replace("D-01 源分支", "决策-01 源分支"),
+      "zh-CN",
+      expectedTechnicalLiterals,
+    ),
+    /session language/,
+  );
+  assert.throws(
+    () => assertDecisionTreeLanguage(
+      chineseTree.replace("分支检查", "Branch inspection"),
+      "zh-CN",
+      expectedTechnicalLiterals,
+    ),
+    /session language/,
+  );
+  assert.throws(
+    () => assertDecisionTreeLanguage(
+      chineseTree.replaceAll("main", "主分支"),
+      "zh-CN",
+      expectedTechnicalLiterals,
+    ),
+    /technical literals/,
+  );
+  assert.throws(
+    () => assertDecisionTreeLanguage(
+      chineseTree.replace("2026-08-21T16:30:00+08:00", "2026年8月21日16时30分"),
+      "zh-CN",
+      expectedTechnicalLiterals,
+    ),
+    /technical literals/,
+  );
+  assert.throws(
+    () => assertDecisionTreeLanguage(
+      chineseTree.replace("分支检查", "分支检查 Branch inspection"),
+      "zh-CN",
+      expectedTechnicalLiterals,
+    ),
+    /session language/,
+  );
+  assert.throws(
+    () => assertDecisionTreeLanguage(chineseTree, "en", expectedTechnicalLiterals),
+    /session language/,
+  );
+});
+
+test("Codex trigger coverage includes a Chinese Auto Develop decision tree", async () => {
+  const { assertTriggerBehavior, selectTriggerCases } = await loadVerifier();
+  const [languageCase] = selectTriggerCases("auto-develop-language-zh");
+  assert.match(languageCase.prompt, /简体中文/);
+
+  const chineseOutput = [
+    "SKILL_ACTIVATED: eval-auto-develop-language-zh",
+    "决策树：",
+    "用户目标",
+    "`- D-01 源分支",
+    "| 节点 | 创建时间 | 触发条件 | 证据 | 选项 | 推荐 | 选择 | 原因 | 风险 | 可逆性 | 用户参与 | 结果 |",
+    "| 源分支 | 2026-08-21T16:30:00+08:00 | 开始交付 | 分支检查 | 1. main - 使用默认分支 [推荐] | 选项 1 - main | 选项 1 - main | 默认分支可用 | 低风险 | 可更改目标分支 | 已由调用授权 | 已记录基础版本 |",
+  ].join("\n");
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "auto-develop-language-zh",
+      chineseOutput,
+      "eval-auto-develop-language-zh",
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "auto-develop-language-zh",
+        chineseOutput
+          .replace("决策树：", "Decision tree:")
+          .replace("用户目标", "User goal")
+          .replace(
+            "| 节点 | 创建时间 | 触发条件 | 证据 | 选项 | 推荐 | 选择 | 原因 | 风险 | 可逆性 | 用户参与 | 结果 |",
+            "| Node | Created at | Trigger | Evidence | Options | Recommendation | Selection | Reason | Risk | Reversibility | User involvement | Outcome |",
+          ),
+        "eval-auto-develop-language-zh",
+      ),
+    /session language/,
+  );
 });
 
 test("Auto Develop remains active for every later turn without broadening task scope", async () => {
@@ -456,9 +863,10 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
     "Starting commit: 0123456789abcdef0123456789abcdef01234567.",
     "Task branch: custom/repository-topic.",
     "Worktree: /tmp/feature-worktree; state ready.",
-    "Decision ledger read-back: /tmp/feature-worktree/.codex/plans/small-repository-delivery-decision-tree.md; format Markdown; append-only updates verified; all reported nodes reconciled.",
+    "Decision ledger read-back: /tmp/feature-worktree/.codex/plans/small-repository-delivery-decision-tree.json; format JSON; decision updates by immutable id verified; all reported nodes reconciled.",
     "Decision ledger header: session ID session-42; session name Small repository delivery; task summary Deliver a small repository change.",
     "Decision ledger Git state: agent-private directory .codex/plans; ignored; untracked; excluded from commits.",
+    "Decision ledger schema: version 1; fixed root keys schemaVersion, session, task, decisions; fixed decision keys with typed defaults.",
     "Tracking match: unique candidate at 94%.",
     "Tracking action: automatically bound.",
     "Tracking read-back: verified bound item TASK-42.",
@@ -648,6 +1056,7 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
   for (const [linePrefix, expectedError] of [
     ["Decision ledger header:", /session metadata/],
     ["Decision ledger Git state:", /Git isolation/],
+    ["Decision ledger schema:", /fixed JSON schema/],
   ]) {
     assert.throws(
       () =>
@@ -2969,6 +3378,264 @@ test("Codex trigger verification rejects tool activity and sandbox denial events
   );
 });
 
+test("Codex decision-ledger smoke requires real isolated tool activity", async () => {
+  const { assertDecisionLedgerToolActivity } = await loadVerifier();
+  const helperPath = "/tmp/eval/.agents/skills/eval-auto-develop/scripts/decision-ledger.mjs";
+  const ledgerPath = "/tmp/eval/.codex/plans/small-repository-delivery-decision-tree.json";
+  const operation = (id, command, name, decisionId = "") => JSON.stringify({
+    type: "item.completed",
+    item: {
+      id,
+      type: "command_execution",
+      command,
+      exit_code: 0,
+      status: "completed",
+      aggregated_output: `${JSON.stringify({
+        decision_ledger_operation: name,
+        ledger_path: ledgerPath,
+        decision_id: decisionId,
+      })}\n`,
+    },
+  });
+  const startedOperation = (id, command) => JSON.stringify({
+    type: "item.started",
+    item: {
+      id,
+      type: "command_execution",
+      command,
+      status: "in_progress",
+    },
+  });
+  const withStarted = (id, command, name, decisionId = "") => [
+    startedOperation(id, command),
+    operation(id, command, name, decisionId),
+  ];
+  const createCommand = `node ${helperPath} create --ledger ${ledgerPath}`;
+  const appendCommand = `node ${helperPath} append --ledger ${ledgerPath}`;
+  const readCommand = `node ${helperPath} read --ledger ${ledgerPath}`;
+  const commandActivity = [
+    JSON.stringify({ type: "thread.started", thread_id: "test-thread" }),
+    ...withStarted("item-1", createCommand, "create"),
+    ...withStarted("item-2", appendCommand, "append", "D-01"),
+    ...withStarted("item-3", readCommand, "read"),
+  ].join("\n");
+  const policy = {
+    helperPath,
+    ledgerPath,
+    requiredOperations: ["create", "append", "read"],
+  };
+
+  assert.doesNotThrow(() => assertDecisionLedgerToolActivity(commandActivity, policy));
+  assert.throws(
+    () => assertDecisionLedgerToolActivity(
+      JSON.stringify({ type: "thread.started", thread_id: "test-thread" }),
+      policy,
+    ),
+    /did not operate on the decision ledger/,
+  );
+  assert.throws(
+    () => assertDecisionLedgerToolActivity(
+      JSON.stringify({
+        type: "item.completed",
+        item: { id: "item-4", type: "web_search", query: "decision ledger" },
+      }),
+      policy,
+    ),
+    /prohibited tool activity/,
+  );
+  for (const bypassCommand of [
+    `echo ${path.basename(helperPath)}`,
+    `node /tmp/unbundled/${path.basename(helperPath)} create --ledger ${ledgerPath}`,
+    `node -e "console.log('${helperPath}')"`,
+  ]) {
+    assert.throws(
+      () => assertDecisionLedgerToolActivity(
+        operation("bypass", bypassCommand, "create"),
+        policy,
+      ),
+      /bundled decision-ledger helper/,
+    );
+  }
+  assert.throws(
+    () => assertDecisionLedgerToolActivity(
+      operation(
+        "newline-bypass",
+        `node ${helperPath} create --ledger ${ledgerPath}\nprintf silent-side-effect`,
+        "create",
+      ),
+      { ...policy, requiredOperations: ["create"] },
+    ),
+    /one bundled decision-ledger helper command/,
+  );
+  const failedCommand = JSON.parse(operation(
+    "failed-helper",
+    `node ${helperPath} create --ledger ${ledgerPath}`,
+    "create",
+  ));
+  failedCommand.item.exit_code = 1;
+  failedCommand.item.status = "failed";
+  assert.throws(
+    () => assertDecisionLedgerToolActivity(
+      JSON.stringify(failedCommand),
+      { ...policy, requiredOperations: ["create"] },
+    ),
+    /did not complete successfully/,
+  );
+  assert.throws(
+    () => assertDecisionLedgerToolActivity(
+      startedOperation("unfinished-helper", createCommand),
+      { ...policy, requiredOperations: ["create"] },
+    ),
+    /did not complete successfully/,
+  );
+  const extraOperationActivity = [
+    operation("extra-1", `node ${helperPath} create --ledger ${ledgerPath}`, "create"),
+    operation("extra-2", `node ${helperPath} read --ledger ${ledgerPath}`, "read"),
+    operation("extra-3", `node ${helperPath} append --ledger ${ledgerPath}`, "append", "D-01"),
+    operation("extra-4", `node ${helperPath} read --ledger ${ledgerPath}`, "read"),
+  ].join("\n");
+  assert.throws(
+    () => assertDecisionLedgerToolActivity(extraOperationActivity, policy),
+    /exact required operation sequence/,
+  );
+});
+
+test("bundled decision-ledger CLI emits verifiable operation receipts", async () => {
+  const { runProcessWithClosedStdin } = await loadVerifier();
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "auto-develop-ledger-cli-"));
+  const ledgerPath = path.join(tempRoot, "cli-delivery-decision-tree.json");
+  const helperPath = path.join(root, "skills", "auto-develop", "scripts", "decision-ledger.mjs");
+  const decision = {
+    id: "D-01",
+    type: "source_branch",
+    title: "Source branch",
+    createdAt: "2026-08-21T16:30:00+08:00",
+    parentId: "",
+    trigger: "Choose the source",
+    evidence: [],
+    options: [],
+    recommendation: "",
+    selection: "",
+    reason: "",
+    risk: { level: "", description: "" },
+    reversibility: "",
+    userInvolvement: "",
+    outcome: { status: "", evidence: [], updatedAt: "" },
+  };
+  const runHelper = (...args) => runProcessWithClosedStdin({
+    file: process.execPath,
+    args: [helperPath, ...args],
+    cwd: tempRoot,
+    env: process.env,
+    timeoutMs: 10_000,
+  });
+
+  try {
+    const createResult = await runHelper(
+      "create",
+      "--ledger",
+      ledgerPath,
+      "--session-id",
+      "session-42",
+      "--session-name",
+      "CLI delivery",
+      "--language",
+      "en",
+      "--task-summary",
+      "Exercise the bundled ledger CLI",
+    );
+    const appendResult = await runHelper(
+      "append",
+      "--ledger",
+      ledgerPath,
+      "--decision-json",
+      JSON.stringify(decision),
+    );
+    const firstRead = await runHelper("read", "--ledger", ledgerPath);
+    const updateResult = await runHelper(
+      "update",
+      "--ledger",
+      ledgerPath,
+      "--id",
+      "D-01",
+      "--patch-json",
+      JSON.stringify({ reason: "develop is the first available source" }),
+    );
+    const secondRead = await runHelper("read", "--ledger", ledgerPath);
+
+    const receipts = [createResult, appendResult, firstRead, updateResult, secondRead]
+      .map(({ stdout }) => JSON.parse(stdout.trim()));
+    assert.deepEqual(
+      receipts.map(({ decision_ledger_operation: operationName }) => operationName),
+      ["create", "append", "read", "update", "read"],
+    );
+    assert.ok(receipts.every(({ ledger_path: receiptPath }) => receiptPath === ledgerPath));
+    assert.equal(receipts[1].decision_id, "D-01");
+    assert.equal(receipts[3].decision_id, "D-01");
+    assert.equal(JSON.parse(secondRead.stdout).ledger.decisions[0].reason, "develop is the first available source");
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("Codex stateful smoke verifies persisted decision-ledger evolution", async () => {
+  const { assertDecisionLedgerEvolution } = await loadVerifier();
+  const decision = {
+    id: "D-01",
+    type: "source_branch",
+    title: "Source branch",
+    createdAt: "2026-08-21T16:30:00+08:00",
+    parentId: "",
+    trigger: "Choose the source",
+    evidence: [],
+    options: [],
+    recommendation: "",
+    selection: "",
+    reason: "",
+    risk: { level: "", description: "" },
+    reversibility: "",
+    userInvolvement: "",
+    outcome: { status: "", evidence: [], updatedAt: "" },
+  };
+  const before = {
+    schemaVersion: 1,
+    session: { id: "session-42", name: "Stateful smoke", language: "en" },
+    task: {
+      summary: "Verify persisted ledger evolution",
+      ledgerPath: "/tmp/.codex/plans/small-repository-delivery-decision-tree.json",
+    },
+    decisions: [decision],
+  };
+  const after = {
+    ...before,
+    decisions: [{
+      ...decision,
+      outcome: {
+        status: "Base recorded",
+        evidence: ["develop exists"],
+        updatedAt: "2026-08-21T16:32:00+08:00",
+      },
+    }],
+  };
+
+  assert.doesNotThrow(() => assertDecisionLedgerEvolution(before, after));
+  assert.throws(
+    () => assertDecisionLedgerEvolution(before, { ...after, decisions: [] }),
+    /dropped persisted decision D-01/,
+  );
+  assert.throws(
+    () => assertDecisionLedgerEvolution(before, {
+      ...after,
+      decisions: [{ ...after.decisions[0], createdAt: "2026-08-21T16:33:00+08:00" }],
+    }),
+    /changed immutable identity D-01/,
+  );
+  assert.throws(
+    () => assertDecisionLedgerEvolution(before, before),
+    /did not update an existing decision/,
+  );
+});
+
 test("Codex capable-adapter verification permits only read-only TAPD CLI activity", async () => {
   const { assertReadOnlyTapdActivity } = await loadVerifier();
   const readOnlyActivity = [
@@ -3184,6 +3851,7 @@ test("Codex trigger verification can select one case without weakening the defau
     [
       "auto-develop-negative",
       "auto-develop",
+      "auto-develop-language-zh",
       "auto-develop-create",
       "auto-develop-risk",
       "auto-develop-blocked",
@@ -3208,6 +3876,12 @@ test("Codex trigger verification can select one case without weakening the defau
   assert.equal(autoDevelopCase.turns.length, 7);
   assert.equal(autoDevelopCase.turns[0].behavior, "auto-develop-ledger-progress");
   assert.equal(autoDevelopCase.turns[1].behavior, "auto-develop");
+  assert.equal(autoDevelopCase.turns[0].toolPolicy, "decision-ledger-write");
+  assert.equal(autoDevelopCase.turns[1].toolPolicy, "decision-ledger-write");
+  assert.equal(autoDevelopCase.turns[0].sandbox, "workspace-write");
+  assert.equal(autoDevelopCase.turns[1].sandbox, "workspace-write");
+  assert.match(autoDevelopCase.turns[0].prompt, /actual decision ledger/i);
+  assert.doesNotMatch(autoDevelopCase.turns[0].prompt, /without running tools or changing files/i);
   assert.equal(autoDevelopCase.turns[2].behavior, "auto-develop-session-active");
   assert.equal(autoDevelopCase.turns[3].behavior, "auto-develop-session-paused");
   assert.equal(autoDevelopCase.turns[4].behavior, "auto-develop-session-resumed");

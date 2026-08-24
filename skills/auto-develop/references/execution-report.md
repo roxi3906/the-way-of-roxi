@@ -11,56 +11,75 @@ Use this contract to keep autonomous delivery traceable without turning the repo
 
 ## Maintain the Decision Ledger
 
-Create the ledger before the first material decision at `<project-root>/<agent-private-plans>/<task-summary>-decision-tree.md`. Use the applicable tool-specific hidden directory, such as `.codex/plans/` or `.claude/plans/`; use `.ai/plans/` only when no tool-specific private directory exists. Normalize the short task summary into a filesystem-safe name without path separators. Keep the full path absolute.
+Create the ledger before the first material decision at `<project-root>/<agent-private-plans>/<task-summary>-decision-tree.json`. Use the applicable tool-specific hidden directory, such as `.codex/plans/` or `.claude/plans/`; use `.ai/plans/` only when no tool-specific private directory exists. Normalize the short task summary into a filesystem-safe name without path separators. Keep the full path absolute.
 
 Before creating the file, prove that the directory is private to the agent and ignored by Git, and that the target path is not tracked. If the directory is not ignored, add its root-relative pattern to the repository-local exclude file returned by `git rev-parse --git-path info/exclude`, then repeat the checks. Do not edit a tracked ignore file for the ledger. After creation, read back Git evidence that the file remains ignored and untracked.
 
-Initialize the ledger with this header. Use exact host session metadata when exposed. When the host does not expose a session ID, record `not exposed by host` instead of inventing one; derive a concise session name from the current task only when no host name exists.
+Initialize the file as valid JSON with these exact, case-sensitive English keys. Record exposed host metadata and the current session language when known; otherwise keep the string default `""`. Use `[]` for unavailable lists, `false` for unavailable booleans, and the complete nested default object for unavailable structured content. Never omit a fixed key, use `null`, or translate a JSON key.
 
-```text
-# Decision Tree
-
-Session ID: <host session ID or not exposed by host>
-Session name: <host session name or concise derived name>
-Task summary: <short task summary>
-Decision ledger: <absolute path>
+```json
+{
+  "schemaVersion": 1,
+  "session": {
+    "id": "",
+    "name": "",
+    "language": ""
+  },
+  "task": {
+    "summary": "",
+    "ledgerPath": ""
+  },
+  "decisions": []
+}
 ```
 
-Immediately after each material decision, append this immutable record and read the appended content back:
+Immediately after each material decision, push one object with this exact shape into `decisions`, atomically replace the file, parse the complete JSON document, and read the new object back. Populate every value that is already known and retain the typed default only for content that has not been generated yet.
 
-```text
-D-<sequence> <decision title>
-Created at: <RFC 3339 timestamp in the runtime timezone, including the UTC offset>
-Parent: <root or earlier decision>
-Trigger: <fact or event requiring a choice>
-Evidence: <repository, runtime, tool, test, or user evidence>
-Options:
-1. <credible option label> - <what choosing it means, its benefit, or its main tradeoff> [Recommended]
-2. <credible option label> - <what choosing it means, its benefit, or its main tradeoff>
-Recommendation: Option 1 - <exact recommended option label>
-Selection: Option 1 - <exact selected option label>
-Reason: <why this option best satisfies the task>
-Risk: <low, medium, high and the concrete exposure>
-Reversibility: <how the choice can be undone, or irreversible>
-User involvement: <not required, authorized by invocation, or explicitly required>
-Outcome: pending verification
+```json
+{
+  "id": "",
+  "type": "",
+  "title": "",
+  "createdAt": "",
+  "parentId": "",
+  "trigger": "",
+  "evidence": [],
+  "options": [],
+  "recommendation": "",
+  "selection": "",
+  "reason": "",
+  "risk": {
+    "level": "",
+    "description": ""
+  },
+  "reversibility": "",
+  "userInvolvement": "",
+  "outcome": {
+    "status": "",
+    "evidence": [],
+    "updatedAt": ""
+  }
+}
 ```
 
-Capture `Created at` immediately before appending the decision. Use seconds and an explicit numeric UTC offset, for example `2026-08-19T09:15:30+08:00`; keep that creation time unchanged in later outcome updates.
+Assign every decision a unique immutable `id` such as `D-05.1` and a stable `type` such as `implementation_approach`. Capture `createdAt` immediately before the first write with seconds and an explicit numeric UTC offset, for example `2026-08-19T09:15:30+08:00`; never change it during later updates. Every option uses exactly these keys and typed defaults:
 
-List every credible option on its own line, starting at `1.` and increasing without gaps. After the stable option label, use ` - ` and a meaningful explanation of what choosing it means, its benefit, or its main tradeoff. Reject empty explanations and placeholders such as `TBD`, `N/A`, `unknown`, or their translated equivalents. Mark exactly one option with `[Recommended]` (or `[推荐]` in a Chinese record). Both `Recommendation` and `Selection` must identify an option by number and repeat its exact label, without repeating the explanation, using `Option N - <label>` or the consistently translated `选项 N - <label>` form. `Selection` records the option actually chosen, including when it differs from the recommendation.
-
-Never edit, replace, or reorder an earlier record. When the result becomes known, append an outcome update and read it back:
-
-```text
-Update D-<sequence> Outcome
-Evidence: <tool, repository, runtime, test, or read-back evidence>
-Outcome: <verified final result>
+```json
+{
+  "id": "",
+  "label": "",
+  "description": "",
+  "recommended": false
+}
 ```
+
+Once options exist, give every option a unique stable `id`, meaningful label and description, and mark exactly one option as recommended. Store the recommended and selected option IDs in `recommendation` and `selection`; `selection` may stay `""` only while a required user choice is unresolved.
+
+For every later update, acquire an exclusive per-ledger lock before the read-modify-write transaction, parse the current file, and locate the decision by exact `id`. Require exactly one match, update that same object with newly generated evidence, selection, reason, risk, involvement, or outcome content, then write valid JSON to a sibling temporary file and atomically replace the ledger. Hold the lock through parsed read-back so concurrent writers cannot overwrite another decision's newer state. Never target an update by array position and never edit serialized JSON with string replacement. Parse the replaced file and verify the exact updated object before relying on it. A missing or duplicate ID is a ledger integrity failure; recover from verified evidence instead of inserting a second version of the same decision. Preserve already verified non-default values unless newer verified evidence explicitly corrects them; never change `id`, `type`, or `createdAt` after the object is first pushed.
 
 Record material choices about workflow precedence, source branch, worktree, tracking, requirements, implementation approach, validation, review fixes, and pull-request delivery. Omit trivial shell syntax and mechanically determined steps. Keep rejected alternatives when they explain why the chosen branch was safer or more correct. Use child identifiers such as `D-05.1` when a phase contains multiple material decisions.
 
-At the start of every later turn, resumed session, or context-restored continuation, read the ledger before deciding or acting. If it is missing, recover only from verified preserved evidence and append a recovery record; never silently reconstruct an audit trail from memory.
+At the start of every later turn, resumed session, or context-restored continuation, parse the ledger and validate its schema, typed defaults, unique decision IDs, and recorded absolute `task.ledgerPath` against the file actually opened before deciding or acting. If it is missing or invalid, recover only from verified preserved evidence and add a recovery decision; never silently reconstruct an audit trail from memory.
 
 Keep the ledger ignored, untracked, and outside every commit and pull-request diff by default. Before every commit, verify that its exact path is absent from the index. After commits and before push or draft-PR creation, verify that the path is absent from task history and the complete delivery diff. If it appears, remove only that path from Git delivery state while preserving the working file, then repeat the checks. Invocation alone never authorizes committing the ledger.
 
@@ -79,9 +98,10 @@ Selected source branch: <verified branch>
 Starting commit: <full verified commit hash>.
 Task branch: <verified Git-valid task branch>.
 Worktree: <absolute path>; state ready.
-Decision ledger read-back: <absolute private .md path>; format Markdown; append-only updates verified; all reported nodes reconciled.
+Decision ledger read-back: <absolute private .json path>; format JSON; decision updates by immutable id verified; all reported nodes reconciled.
 Decision ledger header: session ID <value>; session name <value>; task summary <value>.
 Decision ledger Git state: agent-private directory <root-relative hidden plans directory>; ignored; untracked; excluded from commits.
+Decision ledger schema: version 1; fixed root keys schemaVersion, session, task, decisions; fixed decision keys with typed defaults.
 Tracking match: unique candidate at <score>.
 Tracking creation readiness: <score, when creation is considered>
 Tracking action: <automatically bound | automatically created and bound | unavailable>
@@ -120,7 +140,9 @@ Use only the records that describe the actual path. For example, a tracking conf
 
 ## Render the Final Report
 
-Use destination language rules and include these sections when applicable:
+Use the current session language for the terminal report. Resolve it immediately before rendering, store its language tag in `session.language`, and use it for every human-readable decision-tree heading, root label, node title, table heading, option label and description, recommendation marker, reason, risk, involvement value, and outcome. Keep JSON keys, decision and option IDs, Git refs, RFC 3339 timestamps, paths, commands, URLs, and other technical literals unchanged. Validate the expected technical literals in their corresponding tree and table fields, then exclude those literals when checking that the remaining human-readable content contains no text from another language. If ledger values were recorded before the session language changed, translate them for display without translating the stored keys.
+
+Include these sections when applicable:
 
 1. **Outcome**: State whether every acceptance criterion passed or identify the exact blocker.
 2. **Delivery Context**: Show the source branch and full starting commit, task branch, worktree, tracking or monitoring result, aggregate phase synchronization and hybrid-child result, and the absolute decision-tree document path.
@@ -128,9 +150,9 @@ Use destination language rules and include these sections when applicable:
 4. **Verification**: List commands or checks with their final results. For every command, emit `Command: <actual command>` followed by `Result: <verified result>`. Distinguish direct, expanded, and substituted coverage.
 5. **Deep Review**: List findings by severity, the recommended fixes applied, re-review outcome, and any residual risk.
 6. **Draft PR**: Link the verified draft PR and state its base and head branches.
-7. **Decision Tree**: Render every ledger decision record as a connected tree rooted at the user's goal. Consolidate each record with its latest verified outcome update; do not omit child decisions.
+7. **Decision Tree**: Render every decision object as a connected tree rooted at the user's goal in the current session language. Use the current values on each object after its verified ID-based updates; do not omit child decisions.
 
-Render the tree in execution order and include every delivery phase:
+Render the tree in execution order and include every delivery phase. The English example below illustrates structure, not fixed display copy:
 
 ```text
 User goal
@@ -145,7 +167,7 @@ User goal
 `- D-08 Draft PR
 ```
 
-Follow the tree with this decision-details table. Populate every cell for every decision. When only one credible path exists, list it as option `1.`, explain it, and mark it as recommended. Never use `not applicable` for `Created at`, `Options`, `Recommendation`, or `Selection`; use it in another field only when that field genuinely has no applicable state.
+Follow the tree with this decision-details table. Populate every cell for every decision. Translate the table headings and human-readable values consistently into the current session language. When only one credible path exists, list it as option `1.`, explain it, and mark it as recommended. Never use a default placeholder in the rendered table; typed defaults belong only to JSON content that has not yet been generated, while terminal decisions must be complete.
 
 ```text
 | Node | Created at | Trigger | Evidence | Options | Recommendation | Selection | Reason | Risk | Reversibility | User involvement | Outcome |
@@ -160,19 +182,22 @@ Follow the tree with this decision-details table. Populate every cell for every 
 | Draft PR | ... | ... | ... | 1. ... - ... [Recommended]<br>2. ... - ... | Option 1 - ... | Option 1 - ... | ... | ... | ... | ... | ... |
 ```
 
-Include one table row for every tree node, including child decisions, in the same order as the tree. Copy each record's original `Created at` value into its row. Render numbered options and their explanations in one cell separated by `<br>`, preserving the single recommendation marker and the explicit option references in `Recommendation` and `Selection`. For English reports, use these exact `Outcome` values for the eight required phase rows in phase order: `Base recorded`, `Worktree ready`, `Read-back verified`, `Criteria mapped`, `Behavior implemented`, `Passed`, `Re-review clean`, and `URL and refs verified`. Use the actual verified outcome for child decisions. Put details and the next decision in `Evidence` or explanatory prose. Translate these values consistently for a non-English destination. Keep failed attempts and recovered history in explanatory prose, not in the final outcome cell.
+Include one table row for every tree node, including child decisions, in the same order as the tree. Copy each object's original `createdAt` value into its row. Render numbered options and their explanations in one cell separated by `<br>`, preserving the single recommendation marker and the explicit option references in the recommendation and selection columns. For English reports, use these exact outcome values for the eight required phase rows in phase order: `Base recorded`, `Worktree ready`, `Read-back verified`, `Criteria mapped`, `Behavior implemented`, `Passed`, `Re-review clean`, and `URL and refs verified`. Translate those values for another session language. Use the actual verified outcome for child decisions. Put details and the next decision in evidence or explanatory prose. Keep failed attempts and recovered history in explanatory prose, not in the final outcome cell.
 
 Do not invent branches or evidence that were not considered during execution.
 
 Before emitting the terminal response, re-read this contract and the ledger, then verify all of the following:
 
-- the decision-ledger read-back record contains its absolute private Markdown path ending in `-decision-tree.md`;
-- the header records the session ID, session name, and task summary;
+- the decision-ledger read-back record contains its absolute private JSON path ending in `-decision-tree.json`;
+- the complete file parses as JSON with `schemaVersion: 1`, the exact fixed root and nested keys, the required typed defaults, and no `null` values;
+- the session and task objects record the available session ID, session name, current session language, task summary, and ledger path;
 - the Git-state record proves the default ignored, untracked, and commit-excluded state or the exact explicit-user exception;
+- every decision has a unique immutable ID, and every later change read back from the same object selected by that ID;
 - every decision row contains its original valid RFC 3339 creation time;
 - every option list is consecutively numbered, gives every option a meaningful explanation, marks exactly one recommendation, and matches the explicit `Recommendation` and `Selection` option references;
-- every appended decision appears once in the tree and once in the table;
+- every stored decision appears once in the tree and once in the table;
 - every table cell is populated and every outcome uses the latest verified update;
+- every human-readable decision-tree label and value uses the current session language while fixed JSON keys and technical literals remain unchanged;
 - all eight delivery phases appear in order for a successful delivery;
 - every canonical project-management phase appears once in order with its attempted states and read-back result when tracking is bound;
 - every aggregate phase state is backed by an ordered, uniquely identified event payload with durable evidence and historical read-back;
