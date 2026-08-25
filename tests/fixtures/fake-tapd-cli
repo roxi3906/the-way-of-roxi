@@ -16,6 +16,7 @@ argument_value() {
 }
 
 today=2026-08-03
+carried_created=2026-08-01
 command_name=${1:---help}
 fixture_directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 terminal_coverage_complete=true
@@ -91,9 +92,9 @@ EOF
         model=$(argument_value --model "$@" || true)
         if [ "$model" = "stories" ]; then
           if [ "$terminal_coverage_complete" = "true" ]; then
-            printf '{"fixture_operation":"work-items-list-stories","items":[{"id":"parent-1","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Improve README agent documentation","description":"Document the supported agent installation flow for this repository.","status":"Open","status_id":"open","owner":"roxi;","creator":"roxi","created":"%sT09:00:00+08:00","modified":"%sT09:30:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent"},{"id":"parent-done","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Improve README agent documentation (completed)","description":"Document the supported agent installation flow for this repository.","status":"Done","status_id":"done","owner":"roxi;","creator":"roxi","created":"%sT08:00:00+08:00","modified":"%sT08:30:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent-done"}],"page":1,"has_more":false}\n' "$today" "$today" "$today" "$today"
+            printf '{"fixture_operation":"work-items-list-stories","items":[{"id":"parent-1","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Improve README agent documentation","description":"Document the supported agent installation flow for this repository.","status":"Open","status_id":"open","owner":"roxi;","creator":"roxi","created":"%sT09:00:00+08:00","modified":"%sT09:30:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent"},{"id":"parent-carried","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Carry unfinished documentation follow-up","description":"Continue the repository documentation follow-up.","status":"Open","status_id":"open","owner":"roxi;","creator":"teammate","created":"%sT10:00:00+08:00","modified":"%sT11:00:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent-carried"},{"id":"parent-delegated","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Delegate target-day documentation follow-up","description":"Continue target-day work after reassignment.","status":"Open","status_id":"open","owner":"teammate;","creator":"roxi","created":"%sT12:00:00+08:00","modified":"%sT12:30:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent-delegated"},{"id":"parent-other","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Ignore another owner backlog","description":"Backlog owned and created by another user.","status":"Open","status_id":"open","owner":"teammate;","creator":"teammate","created":"%sT13:00:00+08:00","modified":"%sT13:30:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent-other"},{"id":"parent-done","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Complete carried documentation review","description":"Complete an older documentation review on the target day.","status":"Done","status_id":"done","owner":"roxi;","creator":"teammate","created":"%sT08:00:00+08:00","completed":"%sT15:00:00+08:00","modified":"%sT15:00:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent-done"}],"page":1,"has_more":false}\n' "$today" "$today" "$carried_created" "$carried_created" "$today" "$today" "$carried_created" "$carried_created" "$carried_created" "$today" "$today"
           else
-            printf '{"fixture_operation":"work-items-list-stories","items":[{"id":"parent-1","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Improve README agent documentation","description":"Document the supported agent installation flow for this repository.","status":"Open","status_id":"open","owner":"roxi;","creator":"roxi","created":"%sT09:00:00+08:00","modified":"%sT09:30:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent"}],"page":1,"has_more":false}\n' "$today" "$today"
+            printf '{"fixture_operation":"work-items-list-stories","items":[{"id":"parent-1","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Improve README agent documentation","description":"Document the supported agent installation flow for this repository.","status":"Open","status_id":"open","owner":"roxi;","creator":"roxi","created":"%sT09:00:00+08:00","modified":"%sT09:30:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent"},{"id":"parent-carried","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Carry unfinished documentation follow-up","description":"Continue the repository documentation follow-up.","status":"Open","status_id":"open","owner":"roxi;","creator":"teammate","created":"%sT10:00:00+08:00","modified":"%sT11:00:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent-carried"},{"id":"parent-delegated","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Delegate target-day documentation follow-up","description":"Continue target-day work after reassignment.","status":"Open","status_id":"open","owner":"teammate;","creator":"roxi","created":"%sT12:00:00+08:00","modified":"%sT12:30:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent-delegated"},{"id":"parent-other","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Ignore another owner backlog","description":"Backlog owned and created by another user.","status":"Open","status_id":"open","owner":"teammate;","creator":"teammate","created":"%sT13:00:00+08:00","modified":"%sT13:30:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent-other"}],"page":1,"has_more":false}\n' "$today" "$today" "$carried_created" "$carried_created" "$today" "$today" "$carried_created" "$carried_created"
           fi
         else
           printf '{"fixture_operation":"work-items-list-%s","items":[],"page":1,"has_more":false}\n' "$model"
@@ -102,30 +103,64 @@ EOF
       get)
         requested_workspace=$(argument_value --workspace-id "$@" || true)
         requested_id=$(argument_value --id "$@" || true)
-        if [ "$requested_workspace" != "workspace-1" ] || [ "$requested_id" != "parent-1" ]; then
+        if [ "$requested_workspace" != "workspace-1" ]; then
           printf '%s\n' '{"fixture_operation":"work-items-get-invalid","error":"not_found"}' >&2
           exit 3
         fi
-        printf '{"fixture_operation":"work-items-get-parent-1","id":"parent-1","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Improve README agent documentation","description":"Document the supported agent installation flow for this repository.","status":"Open","status_id":"open","owner":"roxi;","creator":"roxi","created":"%sT09:00:00+08:00","modified":"%sT09:30:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent"}\n' "$today" "$today"
+        case "$requested_id" in
+          parent-1)
+            printf '{"fixture_operation":"work-items-get-parent-1","id":"parent-1","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Improve README agent documentation","description":"Document the supported agent installation flow for this repository.","status":"Open","status_id":"open","owner":"roxi;","creator":"roxi","created":"%sT09:00:00+08:00","modified":"%sT09:30:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent"}\n' "$today" "$today"
+            ;;
+          parent-carried)
+            printf '{"fixture_operation":"work-items-get-parent-carried","id":"parent-carried","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Carry unfinished documentation follow-up","description":"Continue the repository documentation follow-up.","status":"Open","status_id":"open","owner":"roxi;","creator":"teammate","created":"%sT10:00:00+08:00","modified":"%sT11:00:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent-carried"}\n' "$carried_created" "$carried_created"
+            ;;
+          parent-delegated)
+            printf '{"fixture_operation":"work-items-get-parent-delegated","id":"parent-delegated","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Delegate target-day documentation follow-up","description":"Continue target-day work after reassignment.","status":"Open","status_id":"open","owner":"teammate;","creator":"roxi","created":"%sT12:00:00+08:00","modified":"%sT12:30:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent-delegated"}\n' "$today" "$today"
+            ;;
+          parent-other)
+            printf '{"fixture_operation":"work-items-get-parent-other","id":"parent-other","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Ignore another owner backlog","description":"Backlog owned and created by another user.","status":"Open","status_id":"open","owner":"teammate;","creator":"teammate","created":"%sT13:00:00+08:00","modified":"%sT13:30:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent-other"}\n' "$carried_created" "$carried_created"
+            ;;
+          parent-done)
+            printf '{"fixture_operation":"work-items-get-parent-done","id":"parent-done","workspace_id":"workspace-1","type_id":"story","type":"Requirement","title":"【Trigger Evaluation Repository】Complete carried documentation review","description":"Complete an older documentation review on the target day.","status":"Done","status_id":"done","owner":"roxi;","creator":"teammate","created":"%sT08:00:00+08:00","completed":"%sT15:00:00+08:00","modified":"%sT15:00:00+08:00","repository":"Trigger Evaluation Repository","url":"https://tapd.example.invalid/workitems/parent-done"}\n' "$carried_created" "$today" "$today"
+            ;;
+          *)
+            printf '%s\n' '{"fixture_operation":"work-items-get-invalid","error":"not_found"}' >&2
+            exit 3
+            ;;
+        esac
         ;;
       history)
         requested_workspace=$(argument_value --workspace-id "$@" || true)
         requested_id=$(argument_value --id "$@" || true)
-        if [ "$requested_workspace" != "workspace-1" ] || [ "$requested_id" != "parent-1" ]; then
+        if [ "$requested_workspace" != "workspace-1" ]; then
           printf '%s\n' '{"fixture_operation":"work-items-history-invalid","error":"not_found"}' >&2
           exit 3
         fi
-        if [ "$phase_writable" = "true" ]; then
-          printf '%s' '{"fixture_operation":"work-items-history-parent-1","items":[],"phase_events":[{"event_id":"delivery-42-02","delivery_id":"delivery-42","stage":"technical research","state":"started","summary":"research started","evidence":"decision ledger D-02","next_stage":"technical research","event_time":"2026-08-19T09:01:00+08:00"}'
-          if [ -f "$phase_events_file" ]; then
-            while IFS= read -r phase_event; do
-              printf ',%s' "$phase_event"
-            done < "$phase_events_file"
-          fi
-          printf '%s\n' '],"complete":true}'
-        else
-          printf '%s\n' '{"fixture_operation":"work-items-history-parent-1","items":[],"complete":true}'
-        fi
+        case "$requested_id" in
+          parent-1)
+            if [ "$phase_writable" = "true" ]; then
+              printf '%s' '{"fixture_operation":"work-items-history-parent-1","items":[],"phase_events":[{"event_id":"delivery-42-02","delivery_id":"delivery-42","stage":"technical research","state":"started","summary":"research started","evidence":"decision ledger D-02","next_stage":"technical research","event_time":"2026-08-19T09:01:00+08:00"}'
+              if [ -f "$phase_events_file" ]; then
+                while IFS= read -r phase_event; do
+                  printf ',%s' "$phase_event"
+                done < "$phase_events_file"
+              fi
+              printf '%s\n' '],"complete":true}'
+            else
+              printf '%s\n' '{"fixture_operation":"work-items-history-parent-1","items":[],"complete":true}'
+            fi
+            ;;
+          parent-done)
+            printf '{"fixture_operation":"work-items-history-parent-done","items":[{"field":"status","from":"open","to":"done","created":"%sT15:00:00+08:00"}],"complete":true}\n' "$today"
+            ;;
+          parent-carried|parent-delegated|parent-other)
+            printf '{"fixture_operation":"work-items-history-%s","items":[],"complete":true}\n' "$requested_id"
+            ;;
+          *)
+            printf '%s\n' '{"fixture_operation":"work-items-history-invalid","error":"not_found"}' >&2
+            exit 3
+            ;;
+        esac
         ;;
       activity)
         if [ "$phase_writable" != "true" ] || [ "${3:-}" != "append" ]; then

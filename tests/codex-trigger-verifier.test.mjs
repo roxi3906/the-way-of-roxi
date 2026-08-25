@@ -3256,12 +3256,62 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
     ),
   );
 
+  const validCapableSummary = [
+    "SKILL_ACTIVATED: eval-tapd-summary-capable",
+    "- 2026-08-03",
+    "  - Trigger Evaluation Repository",
+    "    - Improve README agent documentation",
+    "    - Carry unfinished documentation follow-up",
+    "    - Delegate target-day documentation follow-up",
+    "    - Complete carried documentation review",
+    "- 次日计划",
+    "  - Trigger Evaluation Repository",
+    "    - Improve README agent documentation",
+    "    - Carry unfinished documentation follow-up",
+    "    - Delegate target-day documentation follow-up",
+  ].join("\n");
   assert.doesNotThrow(() =>
     assertTriggerBehavior(
       "tapd-summary-capable",
-      "SKILL_ACTIVATED: eval-tapd-summary-capable\nToday\n【Trigger Evaluation Repository】Improve README agent documentation",
+      validCapableSummary,
       "eval-tapd-summary-capable",
     ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "tapd-summary-capable",
+        validCapableSummary.replace("    - Carry unfinished documentation follow-up\n", ""),
+        "eval-tapd-summary-capable",
+      ),
+    /required daily and next-day work sets/,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "tapd-summary-capable",
+        validCapableSummary.replace(/\n    - Delegate target-day documentation follow-up$/, ""),
+        "eval-tapd-summary-capable",
+      ),
+    /required daily and next-day work sets/,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "tapd-summary-capable",
+        `${validCapableSummary}\n    - Complete carried documentation review`,
+        "eval-tapd-summary-capable",
+      ),
+    /required daily and next-day work sets/,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "tapd-summary-capable",
+        `${validCapableSummary}\n    - Ignore another owner backlog`,
+        "eval-tapd-summary-capable",
+      ),
+    /required daily and next-day work sets/,
   );
   assert.throws(
     () =>
@@ -3270,7 +3320,7 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
         "SKILL_ACTIVATED: eval-tapd-summary-capable\nA complete TAPD summary is unavailable.",
         "eval-tapd-summary-capable",
       ),
-    /capable read-only adapter/,
+    /required daily and next-day work sets/,
   );
 
   assert.doesNotThrow(() =>
@@ -3728,19 +3778,82 @@ test("Codex capable-adapter verification permits only read-only TAPD CLI activit
       ),
     /missing required TAPD reads: identity/,
   );
+  const duplicateRefresh = [
+    JSON.stringify({
+      type: "item.completed",
+      item: {
+        id: "item-8",
+        type: "command_execution",
+        command: "tapd-cli work-items get --workspace-id workspace-1 --id parent-1",
+        aggregated_output: '{"fixture_operation":"work-items-get-parent-1"}\n',
+      },
+    }),
+    JSON.stringify({
+      type: "item.completed",
+      item: {
+        id: "item-9",
+        type: "command_execution",
+        command: "tapd-cli work-items get --workspace-id workspace-1 --id parent-1",
+        aggregated_output: '{"fixture_operation":"work-items-get-parent-1"}\n',
+      },
+    }),
+  ].join("\n");
+  assert.throws(
+    () =>
+      assertReadOnlyTapdActivity(duplicateRefresh, [], {
+        exactOperationCounts: { "work-items-get-parent-1": 1 },
+      }),
+    /expected 1, observed 2/,
+  );
+  assert.doesNotThrow(() =>
+    assertReadOnlyTapdActivity(
+      JSON.stringify({
+        type: "item.completed",
+        item: {
+          id: "item-10",
+          type: "command_execution",
+          command: "tapd-cli work-items get --workspace-id workspace-1 --id parent-1",
+          aggregated_output: '{"fixture_operation":"work-items-get-parent-1"}\n',
+          output: '{"fixture_operation":"work-items-get-parent-1"}\n',
+        },
+      }),
+      [],
+      { exactOperationCounts: { "work-items-get-parent-1": 1 } },
+    ),
+  );
   assert.throws(() => assertReadOnlyTapdActivity(""), /did not inspect the TAPD CLI/);
 });
 
-test("fake TAPD fixture refreshes only the exact retained candidate", async () => {
+test("fake TAPD fixture refreshes only exact retained candidates", async () => {
   const { runProcessWithClosedStdin } = await loadVerifier();
   const fixture = path.join(root, "tests", "fixtures", "fake-tapd-cli");
-  const valid = await runProcessWithClosedStdin({
+  const currentDay = await runProcessWithClosedStdin({
     file: fixture,
     args: ["work-items", "get", "--workspace-id", "workspace-1", "--id", "parent-1"],
     timeoutMs: 2_000,
   });
+  const carried = await runProcessWithClosedStdin({
+    file: fixture,
+    args: ["work-items", "get", "--workspace-id", "workspace-1", "--id", "parent-carried"],
+    timeoutMs: 2_000,
+  });
+  const delegated = await runProcessWithClosedStdin({
+    file: fixture,
+    args: ["work-items", "get", "--workspace-id", "workspace-1", "--id", "parent-delegated"],
+    timeoutMs: 2_000,
+  });
+  const completedHistory = await runProcessWithClosedStdin({
+    file: fixture,
+    args: ["work-items", "history", "--workspace-id", "workspace-1", "--id", "parent-done"],
+    timeoutMs: 2_000,
+  });
 
-  assert.match(valid.stdout, /"fixture_operation":"work-items-get-parent-1"/);
+  assert.match(currentDay.stdout, /"fixture_operation":"work-items-get-parent-1"/);
+  assert.match(carried.stdout, /"fixture_operation":"work-items-get-parent-carried"/);
+  assert.match(carried.stdout, /"created":"2026-08-01T10:00:00\+08:00"/);
+  assert.match(delegated.stdout, /"owner":"teammate;"/);
+  assert.match(completedHistory.stdout, /"work-items-history-parent-done"/);
+  assert.match(completedHistory.stdout, /"to":"done"/);
   await assert.rejects(
     runProcessWithClosedStdin({
       file: fixture,
@@ -3919,6 +4032,13 @@ test("Codex trigger verification can select one case without weakening the defau
   assert.equal(selectTriggerCases("tapd-sync-query-inclusive")[0].useFakeTapd, true);
   assert.equal(selectTriggerCases("tapd-sync-query-inclusive-incomplete")[0].fakeTapdScenario, "terminal-coverage-incomplete");
   assert.equal(selectTriggerCases("tapd-summary-capable")[0].useFakeTapd, true);
+  assert.deepEqual(selectTriggerCases("tapd-summary-capable")[0].exactTapdReadCounts, {
+    "work-items-get-parent-1": 1,
+    "work-items-get-parent-carried": 1,
+    "work-items-get-parent-delegated": 1,
+    "work-items-get-parent-other": 0,
+    "work-items-get-parent-done": 0,
+  });
   assert.doesNotMatch(selectTriggerCases("tapd-summary-negative")[0].prompt, /TAPD/i);
   assert.throws(() => selectTriggerCases("missing-skill"), /Unknown Codex trigger case/);
 });

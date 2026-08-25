@@ -175,8 +175,8 @@ npx skills add roxi3906/the-way-of-roxi --list
 - Runs only when explicitly invoked as `$tapd-summary` or selected by name
 - Reads every configured workspace and relevant work-item model without mutating TAPD
 - Separates TAPD workspace containers from project-name evidence
-- Combines current-user creation and verified completion events without title-based deduplication
-- Produces a live next-day plan from target-day work that remains unfinished
+- Combines target-day current-user creation and verified completion events with current-user-owned nonterminal work from any creation date
+- Carries current-user-owned nonterminal work into both the daily summary and live next-day plan while retaining unfinished target-day-created work
 - Returns compact unordered lists grouped by project with title-only work items
 
 ## Maintainer Verification
