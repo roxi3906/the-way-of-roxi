@@ -35,7 +35,7 @@ If none applies, stop this skill immediately. Do not discover adapters, query TA
 2. Resolve the requested sections independently: follow explicit section requests; otherwise select both the daily summary and the next-day plan.
 3. When the user requests only the daily summary, produce only that section.
 4. When the user requests only the next-day plan, produce only that section, using the independently resolved target date.
-5. Treat a next-day plan for any target date as a live report of work created on that date that remains unfinished at query time. Do not reconstruct a historical open-state snapshot unless the user explicitly asks for one and the adapter can prove it.
+5. Treat a next-day plan for any target date as a live report: include current-user-owned nonterminal work from any creation date, plus work created by the current user on the target date that remains nonterminal at query time. Do not reconstruct a historical open-state snapshot unless the user explicitly asks for one and the adapter can prove it.
 
 ## Select One Read-Only TAPD Adapter
 
@@ -69,9 +69,9 @@ For every configured workspace:
 6. Fetch status histories or change logs needed to verify completion events.
 7. Continue with other workspaces after an isolated read failure, but mark the final result incomplete.
 
-## Build the Daily Summary
+## Build the Report Sets
 
-Build two internal sets for the target day:
+Build the Created and Completed sets for the target day, then refresh current work before composing either requested section.
 
 ### Created Set
 
@@ -92,21 +92,27 @@ For a legacy Task, require the documented owner to include the current user, the
 
 Never treat an updated timestamp, arbitrary status change, closed-looking label, or terminal status without a dated completion event as proof of completion.
 
-## Build the Next-Day Plan
+### Current Nonterminal Set
 
-Start only from the Created Set for the target day. Immediately before rendering:
+Immediately before rendering:
 
-1. Fetch the current status of every candidate again.
-2. Resolve that status against the candidate's workspace workflow.
-3. Include only candidates that are currently non-terminal.
-4. Exclude completed items even when they were incomplete in an earlier page or query result.
+1. Build one candidate pool from scanned items whose listed status resolves as nonterminal and whose documented owner includes the current user or whose identity belongs to the Created Set.
+2. Deduplicate that pool by entity identity and fetch each candidate's current state once.
+3. Resolve each refreshed status against the candidate's workspace workflow.
+4. Add a candidate to the Current Nonterminal Set only when its refreshed owner still includes the current user and its refreshed status is nonterminal. Creation date and creator do not restrict this set.
+5. Add a Created Set candidate to the Refreshed Created Open Set when its refreshed status is nonterminal, even when its owner is another user.
+6. Exclude a refreshed terminal item from both nonterminal sets even when an earlier page or query showed it as open.
 
-Do not include older unfinished work unless the user explicitly broadens the plan beyond the default rule.
+### Compose the Requested Sections
+
+- Build the daily summary as the identity union of the Created, Completed, and Current Nonterminal sets.
+- Build the next-day plan as the identity union of the Current Nonterminal and Refreshed Created Open sets.
+- Include older unfinished work through the Current Nonterminal Set by default.
 
 ## Deduplicate by Entity Identity
 
 - Use workspace, underlying model, and work-item ID as the identity key.
-- Render one entry when the same work item appears in both the Created Set and Completed Set.
+- Render one entry per section when the same work item appears in multiple sets used by that section.
 - Preserve separate entries when model or ID differs, even if titles are identical.
 - Never deduplicate by normalized title alone.
 - Keep IDs internal; never render them in the final summary.
@@ -161,8 +167,8 @@ Before rendering a complete result:
 2. Confirm every relevant model was attempted and every page was exhausted.
 3. Confirm creator and owner comparisons use the resolved current user.
 4. Confirm completion classifications follow the model-specific evidence rules.
-5. Confirm every next-day candidate was refreshed against its workspace's current terminal states.
-6. Confirm the union identity count equals `created + completed - intersection` before project grouping.
+5. Confirm every current-work candidate was refreshed once against its workspace's current terminal states and current ownership.
+6. Confirm the daily identity count equals the union of Created, Completed, and Current Nonterminal, and the next-day identity count equals the union of Current Nonterminal and Refreshed Created Open, before project grouping.
 7. Confirm stripping project prefixes did not change title bodies.
 8. Confirm no workspace name was substituted for an unresolved project.
 

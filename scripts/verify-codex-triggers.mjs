@@ -212,8 +212,18 @@ const triggerCases = [
     requiredTapdReads: [
       ...tapdInitializationReads,
       "work-items-get-parent-1",
+      "work-items-get-parent-carried",
+      "work-items-get-parent-delegated",
       "work-items-history-parent-1",
+      "work-items-history-parent-done",
     ],
+    exactTapdReadCounts: {
+      "work-items-get-parent-1": 1,
+      "work-items-get-parent-carried": 1,
+      "work-items-get-parent-delegated": 1,
+      "work-items-get-parent-other": 0,
+      "work-items-get-parent-done": 0,
+    },
     prompt: "$eval-tapd-summary-capable Use the authenticated read-only tapd-cli available in PATH to summarize TAPD work from 2026-08-03 and the next-day plan. Do not read or edit repository files.",
   },
 ];
@@ -2060,11 +2070,31 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
   }
 
   if (caseId === "tapd-summary-capable") {
+    const expectedInBothSections = [
+      "Improve README agent documentation",
+      "Carry unfinished documentation follow-up",
+      "Delegate target-day documentation follow-up",
+    ];
+    const completedTitle = "Complete carried documentation review";
+    const excludedTitle = "Ignore another owner backlog";
+    const targetDayStart = output.indexOf("2026-08-03");
+    const nextDayPlanStart = output.indexOf("次日计划", targetDayStart + 1);
+    const sectionOrderIsValid = targetDayStart !== -1 && nextDayPlanStart > targetDayStart;
+    const targetDaySection = sectionOrderIsValid
+      ? output.slice(targetDayStart, nextDayPlanStart)
+      : "";
+    const nextDayPlanSection = sectionOrderIsValid ? output.slice(nextDayPlanStart) : "";
     if (
-      !/【Trigger Evaluation Repository】Improve README agent documentation(?! \(completed\))/.test(output) ||
+      !sectionOrderIsValid ||
+      expectedInBothSections.some(
+        (title) => !targetDaySection.includes(title) || !nextDayPlanSection.includes(title),
+      ) ||
+      !targetDaySection.includes(completedTitle) ||
+      nextDayPlanSection.includes(completedTitle) ||
+      output.includes(excludedTitle) ||
       /(unavailable|not configured|不可用|无法)/i.test(output)
     ) {
-      throw new Error("tapd-summary did not use the capable read-only adapter data");
+      throw new Error("tapd-summary did not preserve the required daily and next-day work sets");
     }
     return;
   }
@@ -2391,9 +2421,13 @@ const assertTapdOnlyCommand = (command, { allowPhaseWrite = false } = {}) => {
   }
 };
 
-export const assertReadOnlyTapdActivity = (stdout, requiredOperations = []) => {
+export const assertReadOnlyTapdActivity = (
+  stdout,
+  requiredOperations = [],
+  { exactOperationCounts = {} } = {},
+) => {
   const commands = [];
-  const operations = new Set();
+  const operationCounts = new Map();
   const prohibitedItemTypes = new Set([
     "file_change",
     "mcp_tool_call",
@@ -2415,18 +2449,38 @@ export const assertReadOnlyTapdActivity = (stdout, requiredOperations = []) => {
     assertTapdOnlyCommand(command);
     commands.push(command);
 
-    const commandOutput = [event.item.aggregated_output, event.item.output]
-      .filter((value) => value !== undefined)
-      .join("\n");
-    for (const match of commandOutput.matchAll(/"fixture_operation"\s*:\s*"([^"]+)"/g)) {
-      operations.add(match[1]);
+    const eventOperationCounts = new Map();
+    const commandOutputs = new Set(
+      [event.item.aggregated_output, event.item.output]
+        .filter((value) => value !== undefined)
+        .map(String),
+    );
+    for (const commandOutput of commandOutputs) {
+      const outputOperationCounts = new Map();
+      for (const match of commandOutput.matchAll(/"fixture_operation"\s*:\s*"([^"]+)"/g)) {
+        outputOperationCounts.set(match[1], (outputOperationCounts.get(match[1]) || 0) + 1);
+      }
+      for (const [operation, count] of outputOperationCounts) {
+        eventOperationCounts.set(operation, Math.max(eventOperationCounts.get(operation) || 0, count));
+      }
+    }
+    for (const [operation, count] of eventOperationCounts) {
+      operationCounts.set(operation, (operationCounts.get(operation) || 0) + count);
     }
   }
 
   if (commands.length === 0) throw new Error("Codex did not inspect the TAPD CLI");
-  const missingOperations = requiredOperations.filter((operation) => !operations.has(operation));
+  const missingOperations = requiredOperations.filter((operation) => !operationCounts.has(operation));
   if (missingOperations.length > 0) {
     throw new Error(`Codex is missing required TAPD reads: ${missingOperations.join(", ")}`);
+  }
+  for (const [operation, expectedCount] of Object.entries(exactOperationCounts)) {
+    const observedCount = operationCounts.get(operation) || 0;
+    if (observedCount !== expectedCount) {
+      throw new Error(
+        `Codex TAPD read ${operation} expected ${expectedCount}, observed ${observedCount}`,
+      );
+    }
   }
   return [...new Set(commands)];
 };
@@ -2625,6 +2679,10 @@ const runTriggerCase = async (triggerCase) => {
           assertReadOnlyTapdActivity(
             result.stdout,
             turn.requiredTapdReads || triggerCase.requiredTapdReads || [],
+            {
+              exactOperationCounts:
+                turn.exactTapdReadCounts || triggerCase.exactTapdReadCounts || {},
+            },
           );
         } else if (turn.toolPolicy === "tapd-phase-write") {
           assertTapdPhaseWriteActivity(result.stdout);
