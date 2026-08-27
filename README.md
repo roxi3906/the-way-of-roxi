@@ -145,7 +145,7 @@ npx skills add roxi3906/the-way-of-roxi --list
 - Context-aware language selection for each output destination
 - Planning artifact placement
 - Git conventions and PR authorization
-- Post-merge PR cleanup approval and scope limits
+- Post-merge cleanup approval, bound project-management work-item transitions, and scope limits
 - Product language selection
 - Frontend coding style
 - Comment language

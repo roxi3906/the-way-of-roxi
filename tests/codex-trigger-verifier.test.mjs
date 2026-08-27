@@ -3005,6 +3005,169 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
     ),
   );
 
+  const validCleanupPlan = [
+    "SKILL_ACTIVATED: eval-roxis-way-cleanup",
+    "清理计划（尚未执行，等待批准）：",
+    "- PR：#42",
+    "- 分支：feat/docs",
+    "- 工作树：/tmp/feat-docs",
+    "- 项目管理工作项：TAPD STORY-42，当前状态 In Progress。",
+    "- 工作项类型：STORY；当前项目工作流元数据显示成功终态为 status_9（Verified Done）。",
+    "- 默认操作：根据工作项类型和项目工作流元数据解析成功终态，再将 STORY-42 流转到 status_9。",
+    "- 平台读取命令：pmctl workflow terminal --item STORY-42",
+    "- 平台流转命令：pmctl work-item transition --id STORY-42 --to status_9",
+    "- 用户覆盖：若用户要求其他状态或动作，则按该要求调整。",
+    "批准门槛：获得用户明确批准后才执行以上清理命令和平台写操作。",
+  ].join("\n");
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "roxis-way-cleanup",
+      validCleanupPlan,
+      "eval-roxis-way-cleanup",
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "roxis-way-cleanup",
+        validCleanupPlan.replace(/^- 项目管理工作项：.*\n/m, ""),
+        "eval-roxis-way-cleanup",
+      ),
+    /linked project-management work item/,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "roxis-way-cleanup",
+        validCleanupPlan
+          .replace(
+            "根据工作项类型和项目工作流元数据解析成功终态，再将 STORY-42 流转到 status_9",
+            "直接流转到已完成",
+          )
+          .replace("--to status_9", "--to done"),
+        "eval-roxis-way-cleanup",
+      ),
+    /workflow-derived terminal state/,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "roxis-way-cleanup",
+        validCleanupPlan.replace(/^- 平台读取命令：.*\n/m, ""),
+        "eval-roxis-way-cleanup",
+      ),
+    /exact project-management read and mutation commands/,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "roxis-way-cleanup",
+        validCleanupPlan.replace(/^- 用户覆盖：.*\n/m, ""),
+        "eval-roxis-way-cleanup",
+      ),
+    /user override/,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "roxis-way-cleanup",
+        validCleanupPlan
+          .replace("清理计划（尚未执行，等待批准）", "清理结果（已执行）")
+          .replace(/批准门槛：.*$/m, "平台写操作已经完成。"),
+        "eval-roxis-way-cleanup",
+      ),
+    /approval gate/,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "roxis-way-cleanup",
+        `${validCleanupPlan}\nTAPD STORY-42 transitioned to Verified Done.`,
+        "eval-roxis-way-cleanup",
+    ),
+    /approval gate/,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "roxis-way-cleanup",
+        `${validCleanupPlan}\npmctl work-item transition --id STORY-42 --to done`,
+        "eval-roxis-way-cleanup",
+      ),
+    /exact project-management read and mutation commands/,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "roxis-way-cleanup",
+        `${validCleanupPlan}\nTAPD STORY-42 transition succeeded.`,
+        "eval-roxis-way-cleanup",
+      ),
+    /approval gate/,
+  );
+
+  const unavailableCleanupPlan = [
+    "SKILL_ACTIVATED: eval-roxis-way-cleanup-unavailable",
+    "清理计划（尚未执行，等待批准）：",
+    "- 项目管理工作项：TAPD STORY-42，当前状态 In Progress。",
+    "- 平台状态：工作流元数据不可用，无法可靠解析终态。",
+    "- 计划动作：leave untouched；原因是缺少所需工作流元数据，不执行平台写操作，也不宣称工作项已清理。",
+    "- 独立本地动作：删除 feat/docs 分支和 /tmp/feat-docs 工作树。",
+    "批准门槛：获得用户明确批准后才执行独立本地清理命令。",
+  ].join("\n");
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "roxis-way-cleanup-unavailable",
+      unavailableCleanupPlan,
+      "eval-roxis-way-cleanup-unavailable",
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "roxis-way-cleanup-unavailable",
+        `${unavailableCleanupPlan}\npmctl work-item transition --id STORY-42 --to done`,
+        "eval-roxis-way-cleanup-unavailable",
+      ),
+    /leave the unverifiable work item untouched/,
+  );
+
+  const failedReadBackReport = [
+    "SKILL_ACTIVATED: eval-roxis-way-cleanup-readback-failed",
+    "清理结果：",
+    "- 本地分支和工作树：已按批准计划删除。",
+    "- TAPD STORY-42：已尝试执行批准的流转命令，但状态回读失败。",
+    "- 最终状态：未验证；不宣称工作项流转成功，需恢复平台读取能力后重新确认。",
+  ].join("\n");
+  assert.doesNotThrow(() =>
+    assertTriggerBehavior(
+      "roxis-way-cleanup-readback-failed",
+      failedReadBackReport,
+      "eval-roxis-way-cleanup-readback-failed",
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "roxis-way-cleanup-readback-failed",
+        failedReadBackReport.replace(
+          "最终状态：未验证；不宣称工作项流转成功，需恢复平台读取能力后重新确认。",
+          "最终状态：回读失败，但 STORY-42 已成功流转到 status_9。",
+        ),
+        "eval-roxis-way-cleanup-readback-failed",
+    ),
+    /unverified final project-management status/,
+  );
+  assert.throws(
+    () =>
+      assertTriggerBehavior(
+        "roxis-way-cleanup-readback-failed",
+        `${failedReadBackReport}\nTransition succeeded.`,
+        "eval-roxis-way-cleanup-readback-failed",
+      ),
+    /unverified final project-management status/,
+  );
+
   assert.doesNotThrow(() =>
     assertTriggerBehavior(
       "tapd-sync",
@@ -3956,6 +4119,93 @@ test("writable TAPD phase fixture recovers history and verifies one complete eve
   }
 });
 
+test("project-management cleanup fixture requires one approved terminal transition and read-back", async () => {
+  const { assertProjectManagementCleanupActivity, runProcessWithClosedStdin } = await loadVerifier();
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "project-management-cleanup-fixture-"));
+  const fixture = path.join(tempRoot, "pmctl");
+  await cp(path.join(root, "tests", "fixtures", "fake-pmctl"), fixture);
+  await chmod(fixture, 0o755);
+
+  try {
+    const before = await runProcessWithClosedStdin({
+      file: fixture,
+      args: ["work-item", "get", "--id", "STORY-42"],
+      timeoutMs: 2_000,
+    });
+    const workflow = await runProcessWithClosedStdin({
+      file: fixture,
+      args: ["workflow", "terminal", "--item", "STORY-42"],
+      timeoutMs: 2_000,
+    });
+    const transition = await runProcessWithClosedStdin({
+      file: fixture,
+      args: ["work-item", "transition", "--id", "STORY-42", "--to", "status_9"],
+      timeoutMs: 2_000,
+    });
+    const after = await runProcessWithClosedStdin({
+      file: fixture,
+      args: ["work-item", "get", "--id", "STORY-42"],
+      timeoutMs: 2_000,
+    });
+
+    assert.match(before.stdout, /"status_id":"in_progress"/);
+    assert.match(workflow.stdout, /"terminal_status_id":"status_9"/);
+    assert.match(transition.stdout, /"fixture_operation":"work-item-transitioned"/);
+    assert.match(after.stdout, /"status_id":"status_9"/);
+
+    const commandEvent = (id, command, output) => JSON.stringify({
+      type: "item.completed",
+      item: {
+        id,
+        type: "command_execution",
+        status: "completed",
+        exit_code: 0,
+        command,
+        aggregated_output: output,
+      },
+    });
+    const readOnlyEvents = [
+      commandEvent("pm-1", "pmctl work-item get --id STORY-42", before.stdout),
+      commandEvent("pm-2", "pmctl workflow terminal --item STORY-42", workflow.stdout),
+    ].join("\n");
+    const writeEvents = [
+      commandEvent("pm-3", "pmctl work-item transition --id STORY-42 --to status_9", transition.stdout),
+      commandEvent("pm-4", "pmctl work-item get --id STORY-42", after.stdout),
+    ].join("\n");
+
+    assert.doesNotThrow(() =>
+      assertProjectManagementCleanupActivity(readOnlyEvents, { allowTransition: false }),
+    );
+    assert.doesNotThrow(() =>
+      assertProjectManagementCleanupActivity(writeEvents, { allowTransition: true }),
+    );
+    assert.throws(
+      () => assertProjectManagementCleanupActivity(
+        `${writeEvents}\n${commandEvent("pm-5", "pmctl work-item transition --id STORY-42 --to done", transition.stdout)}`,
+        { allowTransition: true },
+      ),
+      /exact approved project-management command sequence/,
+    );
+    assert.throws(
+      () => assertProjectManagementCleanupActivity(
+        commandEvent("pm-3", "pmctl work-item transition --id STORY-42 --to status_9", transition.stdout),
+        { allowTransition: true },
+      ),
+      /verified status_9 read-back/,
+    );
+    await assert.rejects(
+      runProcessWithClosedStdin({
+        file: fixture,
+        args: ["work-item", "transition", "--id", "STORY-42", "--to", "done"],
+        timeoutMs: 2_000,
+      }),
+      /exited with code 4/,
+    );
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test("Codex trigger verification can select one case without weakening the default full run", async () => {
   const { selectTriggerCases } = await loadVerifier();
 
@@ -3969,6 +4219,10 @@ test("Codex trigger verification can select one case without weakening the defau
       "auto-develop-risk",
       "auto-develop-blocked",
       "roxis-way",
+      "roxis-way-cleanup",
+      "roxis-way-cleanup-lifecycle",
+      "roxis-way-cleanup-unavailable",
+      "roxis-way-cleanup-readback-failed",
       "tapd-sync",
       "tapd-sync-lifecycle",
       "tapd-sync-query-default",
@@ -4019,6 +4273,14 @@ test("Codex trigger verification can select one case without weakening the defau
     /decision tree|reversibility|user involvement|post-merge local-resource reminder/i,
   );
   assert.doesNotMatch(selectTriggerCases("auto-develop-negative")[0].prompt, /\$auto-develop/i);
+  const cleanupLifecycleCase = selectTriggerCases("roxis-way-cleanup-lifecycle")[0];
+  assert.equal(cleanupLifecycleCase.sourceSkillId, "roxis-way");
+  assert.equal(cleanupLifecycleCase.useFakeProjectManagement, true);
+  assert.equal(cleanupLifecycleCase.mode, "stateful");
+  assert.equal(cleanupLifecycleCase.turns.length, 2);
+  assert.equal(cleanupLifecycleCase.turns[0].toolPolicy, "pm-cleanup-read-only");
+  assert.equal(cleanupLifecycleCase.turns[1].toolPolicy, "pm-cleanup-write");
+  assert.equal(cleanupLifecycleCase.turns[1].sandbox, "workspace-write");
   assert.equal(selectTriggerCases("auto-develop-create")[0].sourceSkillId, "auto-develop");
   assert.equal(selectTriggerCases("auto-develop-risk")[0].sourceSkillId, "auto-develop");
   assert.equal(selectTriggerCases("auto-develop-blocked")[0].sourceSkillId, "auto-develop");

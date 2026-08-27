@@ -21,8 +21,8 @@ Follow these rules for all work done for the user.
 - When work may create a plan, modify the repository, or require completion validation, ask the user to choose the workspace and validation strategy with numbered quick-reply lists before starting task execution.
 - Before asking the user to choose the workspace strategy, check whether local branches or git worktree branches already match the task and present any matches as ranked options.
 - Only create pull requests after the user gives an explicit instruction for that exact action.
-- Before cleanup after a pull request has been merged, prepare a cleanup plan that lists the PR development contents involved and the exact cleanup script or commands, then submit them to the user for review before execution.
-- During post-merge PR cleanup, only touch items and run commands that were included in the user's reviewed cleanup plan.
+- Before cleanup after a pull request or feature has been merged, prepare a cleanup plan that lists the development contents and confirmed bound project-management work items involved, plus the exact cleanup script or commands, then submit them to the user for review before execution.
+- During post-merge delivery cleanup, only touch items and run commands that were included in the user's reviewed cleanup plan.
 - Only move in-progress plans into tracked shared docs when the user explicitly asks for a shared or long-term document.
 - For product-facing text, use the destination's established language and only fall back to English when no applicable local evidence exists.
 - Before reporting completion, run the selected e2e or closest substitute validation; if the user selected "Other" for validation without details, choose the coverage scope based on risk and state that choice.
@@ -118,14 +118,18 @@ Trigger: Apply this section when committing, naming branches, force-adding ignor
 
 ## Post-Merge Cleanup Constraints
 
-Trigger: Apply this section when cleaning up after a pull request has been merged, including deleting branches, removing worktrees, pruning local files, deleting temporary artifacts, archiving or renaming related threads, or running any cleanup script for that PR.
+Trigger: Apply this section when cleaning up after a pull request or completed feature has been merged, including deleting branches, removing worktrees, pruning local files, deleting temporary artifacts, archiving or renaming related threads, transitioning bound project-management work items, or running any cleanup script for that delivery.
 
-- Before cleanup, prepare a cleanup plan for the user's review. The plan MUST list the PR development contents that make cleanup relevant, including the PR identifier or branch when available, local branches, worktrees, temporary planning artifacts, generated files, scripts, commands, and repository files that the PR work created, modified, or used.
+- Before cleanup, prepare a cleanup plan for the user's review. The plan MUST list the delivery contents that make cleanup relevant, including the PR identifier or branch when available, local branches, worktrees, temporary planning artifacts, generated files, scripts, commands, repository files that the delivery created, modified, or used, and every confirmed project-management work item bound to that delivery.
+- Determine bound work items from existing session or delivery binding records, PR metadata, task artifacts, or explicit user context. Do not discover or infer a new binding merely because an unbound item looks related during cleanup.
+- For each bound work item, list its platform, stable identifier or link, current status, proposed action and target status, and the exact read and mutation commands or platform operations. If the item is nonterminal and the user gives no different requirement, default the proposed action to transition it to a successful terminal state resolved from that project's current workflow and the item's work-item type. Never assume a status label such as `Done` or `已完成` is universally terminal.
+- A user's cleanup-specific requirement for a bound work item overrides the default terminal transition. Reflect the requested status or action in the reviewed plan before performing it.
+- If the platform or required workflow metadata is unavailable, mark the work item as leave untouched with the reason, do not claim it was cleaned up, and continue with other independent items already covered by the reviewed plan.
 - Include the exact cleanup script or command sequence with the cleanup plan, and wait for the user's explicit approval before executing it.
-- The cleanup plan MUST identify each item as delete, keep, archive, move, or leave untouched, and explain why that action belongs to this PR's cleanup.
-- During cleanup, only act on items and commands included in the reviewed cleanup plan. Do not delete, move, reset, prune, archive, or otherwise modify any branch, worktree, file, thread, automation, or artifact outside the approved plan.
+- The cleanup plan MUST identify each item as delete, keep, archive, move, transition, or leave untouched, and explain why that action belongs to this delivery's cleanup.
+- During cleanup, only act on items and commands included in the reviewed cleanup plan. Do not delete, move, reset, prune, archive, transition, or otherwise modify any branch, worktree, file, thread, automation, project-management work item, or artifact outside the approved plan.
 - If cleanup reveals new items or requires different commands, stop and submit an updated cleanup plan and script for the user's review before continuing.
-- After cleanup, report which planned items were completed and any approved items left unchanged.
+- After cleanup, report which planned items were completed and any approved items left unchanged. Read back every attempted project-management transition. Report its final status as verified only when that read-back succeeds; otherwise report the final status as unverified without treating other successful cleanup actions as evidence that the transition succeeded.
 
 ## Product Language
 

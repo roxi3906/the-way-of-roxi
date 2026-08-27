@@ -1,0 +1,76 @@
+#!/bin/sh
+
+set -eu
+
+argument_value() {
+  argument_name=$1
+  shift
+  while [ "$#" -gt 0 ]; do
+    if [ "$1" = "$argument_name" ] && [ "$#" -gt 1 ]; then
+      printf '%s' "$2"
+      return 0
+    fi
+    shift
+  done
+  return 1
+}
+
+fixture_directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+status_file="$fixture_directory/work-item-status"
+command_name=${1:---help}
+
+case "$command_name" in
+  --help|-h|help)
+    printf '%s\n' '{"fixture_operation":"help"}'
+    printf '%s\n' 'pmctl workflow terminal --item STORY-42'
+    printf '%s\n' 'pmctl work-item get --id STORY-42'
+    printf '%s\n' 'pmctl work-item transition --id STORY-42 --to status_9'
+    ;;
+  workflow)
+    if [ "${2:-}" != "terminal" ] || [ "$(argument_value --item "$@" || true)" != "STORY-42" ]; then
+      printf '%s\n' '{"error":"unsupported workflow query"}' >&2
+      exit 3
+    fi
+    printf '%s\n' '{"fixture_operation":"workflow-terminal","item_id":"STORY-42","type_id":"STORY","terminal_status_id":"status_9","terminal_status":"Verified Done","successful":true}'
+    ;;
+  work-item)
+    action=${2:-}
+    requested_id=$(argument_value --id "$@" || true)
+    if [ "$requested_id" != "STORY-42" ]; then
+      printf '%s\n' '{"error":"work item not found"}' >&2
+      exit 3
+    fi
+    case "$action" in
+      get)
+        status_id=in_progress
+        status='In Progress'
+        if [ -f "$status_file" ]; then
+          status_id=$(sed -n '1p' "$status_file")
+          status='Verified Done'
+        fi
+        printf '{"fixture_operation":"work-item-get","id":"STORY-42","type_id":"STORY","status_id":"%s","status":"%s"}\n' "$status_id" "$status"
+        ;;
+      transition)
+        target_status=$(argument_value --to "$@" || true)
+        if [ "$target_status" != "status_9" ]; then
+          printf '%s\n' '{"error":"target is not the workflow-derived terminal state"}' >&2
+          exit 4
+        fi
+        if [ -f "$status_file" ]; then
+          printf '%s\n' '{"error":"work item is already terminal"}' >&2
+          exit 5
+        fi
+        printf '%s\n' 'status_9' > "$status_file"
+        printf '%s\n' '{"fixture_operation":"work-item-transitioned","id":"STORY-42","from":"in_progress","to":"status_9"}'
+        ;;
+      *)
+        printf '%s\n' '{"error":"unsupported work-item action"}' >&2
+        exit 2
+        ;;
+    esac
+    ;;
+  *)
+    printf '%s\n' '{"error":"unsupported command"}' >&2
+    exit 2
+    ;;
+esac
