@@ -124,6 +124,44 @@ const triggerCases = [
     prompt: "Without running tools or editing files, start a small README clarification task and present the repository workflow choices required before planning.",
   },
   {
+    id: "roxis-way-cleanup",
+    sourceSkillId: "roxis-way",
+    evalName: "eval-roxis-way-cleanup",
+    prompt: "Without running tools or changing anything, prepare the cleanup plan for merged PR #42. Assume its feat/docs branch and /tmp/feat-docs worktree remain, and the delivery was bound to TAPD work item STORY-42 whose current status is In Progress and type is STORY. Current project workflow metadata resolves that type's successful terminal state to status_9, displayed as Verified Done. The project-management adapter is named pmctl; its exact read command is `pmctl workflow terminal --item STORY-42`, and its exact mutation command is `pmctl work-item transition --id STORY-42 --to status_9`. The user has not requested an alternate status. Include the local resources, proposed platform action, and exact read and mutation commands in the cleanup plan, explain how an alternate user request would change that action, and wait for explicit approval before execution.",
+  },
+  {
+    id: "roxis-way-cleanup-lifecycle",
+    sourceSkillId: "roxis-way",
+    evalName: "eval-roxis-way-cleanup-lifecycle",
+    mode: "stateful",
+    useFakeProjectManagement: true,
+    turns: [
+      {
+        behavior: "roxis-way-cleanup",
+        toolPolicy: "pm-cleanup-read-only",
+        prompt: "Use only the authenticated pmctl fixture to inspect the bound project-management work item for merged PR #42; do not change it or any local file. The remaining local resources are branch feat/docs and worktree /tmp/feat-docs. The binding is TAPD STORY-42. Read its current status and type, resolve its successful terminal state from current workflow metadata, and prepare the complete cleanup plan with the exact read and mutation commands. The user has not requested an alternate work-item action, but explain how such a request would override the default. Wait for explicit approval before any mutation.",
+      },
+      {
+        behavior: "roxis-way-cleanup-transitioned",
+        toolPolicy: "pm-cleanup-write",
+        sandbox: "workspace-write",
+        prompt: "I explicitly approve only the planned project-management transition for STORY-42. Do not change files, branches, or worktrees in this fixture. Use only pmctl to perform the approved transition, then read the same work item back. Report success only if the read-back verifies the workflow-derived status exactly.",
+      },
+    ],
+  },
+  {
+    id: "roxis-way-cleanup-unavailable",
+    sourceSkillId: "roxis-way",
+    evalName: "eval-roxis-way-cleanup-unavailable",
+    prompt: "Without running tools or changing anything, prepare the cleanup plan for merged PR #42. Assume its feat/docs branch and /tmp/feat-docs worktree remain, and the delivery was bound to TAPD work item STORY-42 whose current status is In Progress. The project-management platform and its workflow metadata are unavailable. Include the work item, leave it untouched with the reason, continue to propose the independent local cleanup, and wait for explicit approval. Do not invent a terminal state or platform mutation command.",
+  },
+  {
+    id: "roxis-way-cleanup-readback-failed",
+    sourceSkillId: "roxis-way",
+    evalName: "eval-roxis-way-cleanup-readback-failed",
+    prompt: "Without running tools or changing anything, report the result of an already approved cleanup for merged PR #42. Assume the approved feat/docs branch and /tmp/feat-docs worktree deletions succeeded, the approved transition of bound TAPD work item STORY-42 was attempted, and its required status read-back failed. Distinguish the successful local cleanup from the unverified project-management result, state the recovery condition, and do not claim the work-item transition succeeded.",
+  },
+  {
     id: "tapd-sync",
     evalName: "eval-tapd-sync",
     prompt: "Without running tools, network requests, or file reads, handle a substantive README review in an isolated environment with no TAPD adapter. Continue the task by reporting one concrete improvement to the thirteen-agent installation documentation.",
@@ -1185,6 +1223,15 @@ const hasForbiddenMergeOrCleanupClaim = (output) =>
     );
   });
 
+const hasCompletedWorkItemTransitionClaim = (output) =>
+  output.split(/\r?\n/).some((line) => {
+    const withoutNegatedClaim = line
+      .replace(/(?:不宣称|不能宣称|无法宣称)[^。；;.!]*(?:流转成功|已完成流转)/gi, "")
+      .replace(/(?:do not|cannot|can't) claim[^.;!]*(?:transition succeeded|was transitioned)/gi, "");
+    return /(?:\bSTORY-42\b|TAPD|项目管理工作项|work item)[^\n。；;.!]{0,100}(?:\btransition(?:ed)? (?:succeeded|completed)\b|\btransitioned to\b|(?:has been|was|already|successfully)\s+(?:transitioned|updated|moved)|(?:已|已经)(?:成功)?(?:流转|更新|转为)|(?:流转|更新)(?:成功|完成))/i.test(withoutNegatedClaim) ||
+      /^\s*(?:work[- ]item\s+)?transition(?:ed)?\s+(?:succeeded|completed)\b/i.test(withoutNegatedClaim);
+  });
+
 const contiguousMarkdownTable = (lines, headerIndex) => {
   if (headerIndex === -1) return [];
   const tableLines = [];
@@ -1935,6 +1982,96 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     return;
   }
 
+  if (caseId === "roxis-way-cleanup") {
+    const hasLinkedWorkItem =
+      /(?:项目管理工作项|project[- ]management work item|TAPD).{0,40}\bSTORY-42\b|\bSTORY-42\b.{0,40}(?:项目管理工作项|project[- ]management work item|TAPD)/is.test(output);
+    if (!hasLinkedWorkItem) {
+      throw new Error("roxis-way cleanup plan omitted the linked project-management work item");
+    }
+
+    if (!/feat\/docs/.test(output) || !/\/tmp\/feat-docs/.test(output)) {
+      throw new Error("roxis-way cleanup plan omitted the delivery branch or worktree");
+    }
+
+    const hasWorkflowDerivedTerminal =
+      /(?:工作项类型|work[- ]item type)/i.test(output) &&
+      /(?:工作流|workflow)/i.test(output) &&
+      /(?:解析|确定|识别|resolve|derive).{0,50}(?:终态|terminal)|(?:终态|terminal).{0,50}(?:解析|确定|识别|resolve|derive)/is.test(output) &&
+      /\bstatus_9\b/.test(output) &&
+      /(?:Verified Done|成功终态)/i.test(output);
+    if (!hasWorkflowDerivedTerminal) {
+      throw new Error("roxis-way cleanup plan did not use a workflow-derived terminal state");
+    }
+
+
+    const transitionTargets = [...output.matchAll(/pmctl work-item transition --id STORY-42 --to ([a-z0-9_-]+)/gi)]
+      .map((match) => match[1]);
+    if (
+      !output.includes("pmctl workflow terminal --item STORY-42") ||
+      transitionTargets.length === 0 ||
+      transitionTargets.some((target) => target !== "status_9")
+    ) {
+      throw new Error("roxis-way cleanup plan omitted the exact project-management read and mutation commands");
+    }
+
+    const hasUserOverride =
+      /(?:用户覆盖|user override)/i.test(output) ||
+      /(?:用户|user).{0,60}(?:其他|另有|alternate|different).{0,60}(?:遵循|按|优先|follow|override|supersede)/is.test(output);
+    if (!hasUserOverride) {
+      throw new Error("roxis-way cleanup plan omitted the user override for project-management actions");
+    }
+
+    const hasApprovalGate =
+      /(?:尚未执行|未执行|not executed|proposed)/i.test(output) &&
+      /(?:明确批准|批准后|explicit approval|after approval)/i.test(output);
+    if (hasCompletedWorkItemTransitionClaim(output) || !hasApprovalGate) {
+      throw new Error("roxis-way cleanup plan did not preserve the approval gate");
+    }
+    return;
+  }
+
+  if (caseId === "roxis-way-cleanup-transitioned") {
+    if (
+      !hasCompletedWorkItemTransitionClaim(output) ||
+      !/\bstatus_9\b/.test(output) ||
+      !/(?:Verified Done|成功终态)/i.test(output) ||
+      !/(?:回读|read[- ]back)/i.test(output) ||
+      /(?:未验证|unverified|回读失败|read[- ]back failed)/i.test(output)
+    ) {
+      throw new Error("roxis-way cleanup did not report the verified approved terminal transition");
+    }
+    return;
+  }
+
+  if (caseId === "roxis-way-cleanup-unavailable") {
+    const leavesWorkItemUntouched =
+      /(?:TAPD|项目管理工作项|work item).{0,40}\bSTORY-42\b|\bSTORY-42\b.{0,40}(?:TAPD|项目管理工作项|work item)/is.test(output) &&
+      /(?:不可用|unavailable)/i.test(output) &&
+      /(?:leave untouched|保持不变|不处理|不执行平台写操作)/i.test(output) &&
+      /feat\/docs/.test(output) &&
+      /\/tmp\/feat-docs/.test(output) &&
+      /(?:明确批准|批准后|explicit approval|after approval)/i.test(output);
+    if (
+      !leavesWorkItemUntouched ||
+      /pmctl work-item transition/i.test(output) ||
+      hasCompletedWorkItemTransitionClaim(output)
+    ) {
+      throw new Error("roxis-way cleanup did not leave the unverifiable work item untouched");
+    }
+    return;
+  }
+
+  if (caseId === "roxis-way-cleanup-readback-failed") {
+    const reportsUnverifiedStatus =
+      /(?:回读|read[- ]back).{0,30}(?:失败|failed)|(?:失败|failed).{0,30}(?:回读|read[- ]back)/i.test(output) &&
+      /(?:最终状态|final status).{0,20}(?:未验证|unverified)/i.test(output) &&
+      /(?:恢复|recover|retry|重新确认)/i.test(output);
+    if (!reportsUnverifiedStatus || hasCompletedWorkItemTransitionClaim(output)) {
+      throw new Error("roxis-way cleanup did not report an unverified final project-management status");
+    }
+    return;
+  }
+
   if (caseId === "tapd-sync") {
     const unavailableMessage = "TAPD is not configured on this device, so sync is disabled.";
     if (
@@ -2590,6 +2727,115 @@ export const assertTapdPhaseWriteActivity = (stdout) => {
   return commands;
 };
 
+export const assertProjectManagementCleanupActivity = (
+  stdout,
+  { allowTransition },
+) => {
+  const prohibitedItemTypes = new Set([
+    "file_change",
+    "mcp_tool_call",
+    "web_search",
+    "computer_use",
+    "image_generation",
+  ]);
+  const operations = [];
+
+  for (const event of parseCodexEvents(stdout)) {
+    if (prohibitedItemTypes.has(event?.item?.type)) {
+      throw new Error(`Codex used prohibited tool activity: ${event.item.type}`);
+    }
+    assertNoSandboxFailure(event);
+    if (event?.type !== "item.completed" || event?.item?.type !== "command_execution") continue;
+    if (event.item.status && event.item.status !== "completed") {
+      throw new Error("Codex project-management command did not complete successfully");
+    }
+    if (event.item.exit_code !== undefined && event.item.exit_code !== 0) {
+      throw new Error("Codex project-management command did not complete successfully");
+    }
+
+    const rawCommand = Array.isArray(event.item.command)
+      ? event.item.command.join(" ")
+      : String(event.item.command || "").trim();
+    const command = rawCommand
+      .replace(/^\/?bin\/(?:ba|z)?sh\s+-lc\s+['"]?/, "")
+      .replace(/^['"]|['"]$/g, "")
+      .trim();
+    const allowedCommands = new Set([
+      "command -v pmctl",
+      "which pmctl",
+      "pmctl --help",
+      "pmctl work-item get --id STORY-42",
+      "pmctl workflow terminal --item STORY-42",
+      ...(allowTransition ? ["pmctl work-item transition --id STORY-42 --to status_9"] : []),
+    ]);
+    if (!allowedCommands.has(command)) {
+      throw new Error("Codex did not use the exact approved project-management command sequence");
+    }
+
+    const commandOutputs = new Set(
+      [event.item.aggregated_output, event.item.output]
+        .filter((value) => value !== undefined)
+        .map(String),
+    );
+    for (const commandOutput of commandOutputs) {
+      for (const line of commandOutput.split(/\r?\n/).filter(Boolean)) {
+        try {
+          const operation = JSON.parse(line);
+          if (operation.fixture_operation) operations.push(operation);
+        } catch {
+          // Human-readable help output carries no state evidence.
+        }
+      }
+    }
+  }
+
+  if (!allowTransition) {
+    const currentItem = operations.find(
+      ({ fixture_operation: operation }) => operation === "work-item-get",
+    );
+    const workflow = operations.find(
+      ({ fixture_operation: operation }) => operation === "workflow-terminal",
+    );
+    if (
+      !currentItem ||
+      currentItem.id !== "STORY-42" ||
+      currentItem.type_id !== "STORY" ||
+      currentItem.status_id !== "in_progress" ||
+      !workflow ||
+      workflow.item_id !== "STORY-42" ||
+      workflow.type_id !== "STORY" ||
+      workflow.terminal_status_id !== "status_9" ||
+      operations.some(({ fixture_operation: operation }) => operation === "work-item-transitioned")
+    ) {
+      throw new Error("Codex did not inspect the project-management item without mutating it");
+    }
+    return operations;
+  }
+
+  const transitions = operations
+    .map((operation, index) => ({ index, operation }))
+    .filter(({ operation }) => operation.fixture_operation === "work-item-transitioned");
+  if (
+    transitions.length !== 1 ||
+    transitions[0].operation.id !== "STORY-42" ||
+    transitions[0].operation.from !== "in_progress" ||
+    transitions[0].operation.to !== "status_9"
+  ) {
+    throw new Error("Codex did not use the exact approved project-management command sequence");
+  }
+  const verifiedReadBack = operations
+    .slice(transitions[0].index + 1)
+    .some((operation) =>
+      operation.fixture_operation === "work-item-get" &&
+      operation.id === "STORY-42" &&
+      operation.status_id === "status_9"
+    );
+  if (!verifiedReadBack) {
+    throw new Error("Codex did not perform the verified status_9 read-back");
+  }
+  return operations;
+};
+
 const runTriggerCase = async (triggerCase) => {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), "the-way-of-roxi-codex-trigger-"));
   const authRoot = await mkdtemp(path.join(os.tmpdir(), "the-way-of-roxi-codex-auth-"));
@@ -2612,8 +2858,10 @@ const runTriggerCase = async (triggerCase) => {
     });
 
     const fakeBin = path.join(tempRoot, "fake-bin");
-    if (triggerCase.useFakeTapd) {
+    if (triggerCase.useFakeTapd || triggerCase.useFakeProjectManagement) {
       await mkdir(fakeBin, { recursive: true });
+    }
+    if (triggerCase.useFakeTapd) {
       const fakeTapdPath = path.join(fakeBin, "tapd-cli");
       await cp(path.join(root, "tests", "fixtures", "fake-tapd-cli"), fakeTapdPath);
       await chmod(fakeTapdPath, 0o755);
@@ -2621,10 +2869,15 @@ const runTriggerCase = async (triggerCase) => {
         await writeFile(path.join(fakeBin, triggerCase.fakeTapdScenario), "");
       }
     }
+    if (triggerCase.useFakeProjectManagement) {
+      const fakePmctlPath = path.join(fakeBin, "pmctl");
+      await cp(path.join(root, "tests", "fixtures", "fake-pmctl"), fakePmctlPath);
+      await chmod(fakePmctlPath, 0o755);
+    }
 
     const codexBin = await resolveExecutable(process.env.CODEX_BIN || "codex");
     const toolPath = [
-      ...(triggerCase.useFakeTapd ? [fakeBin] : []),
+      ...(triggerCase.useFakeTapd || triggerCase.useFakeProjectManagement ? [fakeBin] : []),
       "/usr/bin",
       "/bin",
       "/usr/sbin",
@@ -2686,6 +2939,10 @@ const runTriggerCase = async (triggerCase) => {
           );
         } else if (turn.toolPolicy === "tapd-phase-write") {
           assertTapdPhaseWriteActivity(result.stdout);
+        } else if (turn.toolPolicy === "pm-cleanup-read-only") {
+          assertProjectManagementCleanupActivity(result.stdout, { allowTransition: false });
+        } else if (turn.toolPolicy === "pm-cleanup-write") {
+          assertProjectManagementCleanupActivity(result.stdout, { allowTransition: true });
         } else if (turn.toolPolicy === "decision-ledger-write") {
           const helperPath = path.join(
             tempRoot,
