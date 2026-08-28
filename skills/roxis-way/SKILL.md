@@ -20,6 +20,7 @@ Follow these rules for all work done for the user.
 - Never use the current conversation language as the primary language evidence for a non-conversational output.
 - When work may create a plan, modify the repository, or require completion validation, ask the user to choose the workspace and validation strategy with numbered quick-reply lists before starting task execution.
 - Before asking the user to choose the workspace strategy, check whether local branches or git worktree branches already match the task and present any matches as ranked options.
+- Require every Git commit created during the task to follow Conventional Commits.
 - Only create pull requests after the user gives an explicit instruction for that exact action.
 - Before cleanup after a pull request or feature has been merged, prepare a cleanup plan that lists the development contents and confirmed bound project-management work items involved, plus the exact cleanup script or commands, then submit them to the user for review before execution.
 - During post-merge delivery cleanup, only touch items and run commands that were included in the user's reviewed cleanup plan.
@@ -91,6 +92,11 @@ Trigger: Apply this section when creating or moving any in-progress plan, checkl
 
 Trigger: Apply this section when committing, naming branches, force-adding ignored files, choosing a PR target, drafting a PR title or body, or preparing a pull request.
 
+- Format every Git commit header as `<type>[optional scope][!]: <description>`. Add an optional body and optional footers after blank lines when they provide useful context.
+- Use `feat` for new features and `fix` for bug fixes. Use another type only when it accurately describes the change and complies with any repository-specific commit rules.
+- Mark a breaking change with `!` immediately before `:` or with a `BREAKING CHANGE: <description>` footer.
+- Treat repository-specific commit requirements as additional constraints; every resulting message must still satisfy Conventional Commits.
+- Before running `git commit`, validate the complete message against these rules. Correct an invalid message when its intended meaning is unambiguous; otherwise ask the user to clarify it before committing.
 - Only create a pull request when the user gives an explicit instruction to create a pull request. Do not infer pull request authorization from general completion requests.
 - When the user explicitly asks to include an ignored file in a commit, force-add only that file, such as with `git add -f <file>`. Do not modify `.gitignore` unless the user explicitly asks to change ignore rules.
 - When a new branch must be created and the user has not provided a branch name, include `user` in the branch name and use the format `<type>/user/<summary-branch-name>`, such as `feat/user/add-admin-login` or `fix/user/resolve-payment-timeout`.
