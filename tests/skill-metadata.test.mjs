@@ -226,6 +226,17 @@ test("auto-develop preserves the repository workflow's comment policy", async ()
   assert.doesNotMatch(contents, /Add comments only where the logic would otherwise be difficult to understand\./);
 });
 
+test("roxis-way requires Conventional Commits for every Git commit", async () => {
+  const contents = await readFile(path.join(skillsRoot, "roxis-way", "SKILL.md"), "utf8");
+  const hardRules = contents.match(/## Hard Rules\n([\s\S]*?)(?=\n## )/)?.[1] ?? "";
+  const gitConventions = contents.match(/## Git And PR Conventions\n([\s\S]*?)(?=\n## )/)?.[1] ?? "";
+
+  assert.match(hardRules, /every Git commit[^\n]+Conventional Commits/i);
+  assert.match(gitConventions, /`<type>\[optional scope\]\[!\]: <description>`/);
+  assert.match(gitConventions, /`BREAKING CHANGE: <description>`/);
+  assert.match(gitConventions, /before (?:running|executing) `git commit`/i);
+});
+
 test("phase synchronization preserves event history and honest closeout states", async () => {
   const autoDevelop = await readFile(path.join(skillsRoot, "auto-develop", "SKILL.md"), "utf8");
   const tapdSync = await readFile(path.join(skillsRoot, "tapd-sync", "SKILL.md"), "utf8");
