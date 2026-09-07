@@ -28,6 +28,8 @@ Keep display numbers stable while reviewing the current design. A hidden item re
 
 Show a fixed floating toolbar across every affected preview route, above the project content and usable while scrolling. Keep it compact or repositionable so it does not permanently cover the reviewed controls.
 
+The English toolbar and marker labels below are examples; localize them according to [Communication Language](../SKILL.md#communication-language).
+
 It must provide:
 
 - Previous and next buttons that select the preceding or following change. Disable previous on the first item and next on the last item; for one item both are disabled.

@@ -1,6 +1,6 @@
 interface:
   display_name: "Visual Companion"
   short_description: "Optional HTML mockups and previews in the real project"
-  default_prompt: "Use $visual-companion to handle the current requirement normally, then offer the three design modes at the end of the response if it involves UI or UX changes and continue with my selection."
+  default_prompt: "Use $visual-companion to handle the current requirement normally, communicate in my preferred language, then offer the three design modes at the end of the response if it involves UI or UX changes and continue with my selection."
 policy:
   allow_implicit_invocation: true

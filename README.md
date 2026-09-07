@@ -188,7 +188,8 @@ npx skills add roxi3906/the-way-of-roxi --list
 
 `visual-companion` (Visual Companion) adds optional visual assistance to requirements involving UI or UX changes:
 
-- Handles the original request first, then appends: Visual Companion design assistance is available for this requirement; choose low-fidelity, high-fidelity, or in-project preview and reply with your choice to begin.
+- Keeps skill text in English while using the user's preferred language for communication, invitations, mode labels, and companion debug controls; accepts localized mode selections
+- Handles the original request first, then localizes this invitation into the user's preferred language: Visual Companion design assistance is available for this requirement; choose low-fidelity, high-fidelity, or in-project preview and reply with your choice to begin.
 - Starts only the selected mode; a direct request with a mode already selected needs no repeated invitation
 - Uses simple HTML wireframes for `low-fidelity` to convey entry points and the rough flow
 - Uses the project's actual design language for `high-fidelity` HTML

@@ -1,17 +1,24 @@
 ---
 name: visual-companion
-description: Visual Companion automatically assesses UI and UX changes in user requirements after the normal response and offers optional visual design assistance. Use for interface, layout, navigation, interaction, accessibility, or user-flow changes, and when the user selects low-fidelity, high-fidelity, or in-project preview for the current requirement. Produce low- or high-fidelity HTML, or a mock-only preview inside the real project. Pure backend, documentation, skill-authoring, and conceptual UI discussions without a requested interface or experience change need no offer.
+description: Visual Companion automatically assesses UI and UX changes in user requirements after the normal response and offers optional visual design assistance in the user's preferred language. Use for interface, layout, navigation, interaction, accessibility, or user-flow changes, and when the user selects low-fidelity, high-fidelity, or in-project preview, including localized equivalents, for the current requirement. Produce low- or high-fidelity HTML, or a mock-only preview inside the real project. Pure backend, documentation, skill-authoring, and conceptual UI discussions without a requested interface or experience change need no offer.
 ---
 
 # Visual Companion
 
 Support the user's current requirement with optional visual design. Keep the original task moving; choosing a companion mode is a separate, optional step.
 
+## Communication Language
+
+- Keep the skill instructions, metadata, and references in English. Their language does not determine the language used to communicate with the user.
+- Follow the user's current explicit language preference first, then their saved or established conversation preference. If no preference is known, use the language of their latest substantive message. An English request or quoted English text does not override an established preference unless the user asks to change it.
+- Use that language for progress updates, questions, invitations, mode labels, delivery reports, and companion-owned debug controls and messages. English wording in this skill is a semantic template to localize, not mandatory verbatim output. Preserve established localized mode names within the conversation.
+- Keep technical identifiers, invocation syntax such as `$visual-companion`, paths, and commands unchanged. Product UI copy in the design follows the project's intended locale unless the user requests a different language; the communication preference alone does not authorize translating the product.
+
 ## Response And Offer
 
 1. Handle the user's request normally, including the work or answer it calls for. Do not delay it to ask about visual design, and do not substitute a mockup for requested production implementation.
 2. Before sending the final response, assess whether the actual requirement changes UI or UX: visible content, layout, controls, navigation, interaction, feedback, accessibility, or a user journey. A mixed backend/frontend requirement qualifies when it has a concrete UI or UX change. Merely mentioning UI, explaining a concept, or writing a skill about design does not.
-3. If it qualifies and the user has not selected or declined a mode for this requirement, append this exact standalone sentence near the end of the normal response, after its substantive content:
+3. If it qualifies and the user has not selected or declined a mode for this requirement, append a standalone invitation near the end of the normal response, after its substantive content. Localize the following English template into the user's preferred language, preserving the three modes and the invitation to reply with a choice:
 
    Visual Companion design assistance is available for this requirement; choose low-fidelity, high-fidelity, or in-project preview and reply with your choice to begin.
 
@@ -21,7 +28,7 @@ Use the capabilities and permissions of the current host runtime. Allow implicit
 
 ## Mode Selection
 
-Interpret a reply containing `low-fidelity`, `high-fidelity`, or `in-project preview` as the chosen mode when it refers to the current requirement or pending offer. A user who specifies the requirement and mode together has already selected it; start that mode without another offer or confirmation. If a bare choice has no recoverable requirement, ask which requirement it refers to.
+Interpret a reply containing `low-fidelity`, `high-fidelity`, or `in-project preview`, or a localized equivalent, as the chosen mode when it refers to the current requirement or pending offer. Map the user's wording to the corresponding mode without requiring an English reply. A user who specifies the requirement and mode together has already selected it; start that mode without another offer or confirmation. If a bare choice has no recoverable requirement, ask which requirement it refers to.
 
 Keep the chosen mode for follow-up revisions of the same design until the user changes or ends it. Do not repeat the offer on mode selection, design delivery, or its revisions. Assess a new independent requirement afresh. Where several requirements or choices are genuinely ambiguous, clarify only the missing association.
 
