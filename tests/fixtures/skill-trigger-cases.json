@@ -261,6 +261,52 @@
       },
       "mayCoactivateWith": ["auto-develop", "roxis-way"]
     },
+    "visual-companion": {
+      "invocationPolicy": "implicit",
+      "frontloadCharacters": 420,
+      "frontloadedSignalGroups": [
+        ["visual companion"],
+        ["ui"],
+        ["ux"],
+        ["low-fidelity", "high-fidelity", "in-project preview"]
+      ],
+      "negativeDescriptionSignalGroups": [
+        ["pure backend"],
+        ["skill-authoring"],
+        ["without a requested interface or experience change"]
+      ],
+      "positivePrompts": [
+        "Add filters and an empty state to the project list page.",
+        "Redesign the registration flow so users can return to the previous step and edit their information."
+      ],
+      "paraphrasePrompts": [
+        "I choose low-fidelity for the settings page requirement we just discussed.",
+        "Use Visual Companion's high-fidelity mode to design the new search panel in the current project's style.",
+        "I choose in-project preview to demonstrate the UI changes we just discussed using mock data in the actual project."
+      ],
+      "negativePrompts": [
+        "Optimize the backend batch job without changing user-facing behavior.",
+        "Explain the difference between UI and UX.",
+        "Write a skill describing a high-fidelity design workflow without modifying any pages."
+      ],
+      "explicitInvocations": {
+        "amp": "/visual-companion",
+        "codex": "$visual-companion",
+        "claude-code": "/visual-companion",
+        "cline": "Use the visual-companion skill for this request.",
+        "cursor": "/visual-companion",
+        "gemini-cli": "Use the visual-companion skill for this request.",
+        "github-copilot": "/visual-companion",
+        "goose": "/skills visual-companion",
+        "kimi-code-cli": "/skill:visual-companion",
+        "kiro-cli": "/visual-companion",
+        "opencode": "/visual-companion",
+        "qwen-code": "/visual-companion",
+        "roo": "Use the visual-companion skill for this request.",
+        "windsurf": "Use the visual-companion skill for this request."
+      },
+      "mayCoactivateWith": ["auto-develop", "roxis-way", "tapd-sync"]
+    },
     "tapd-summary": {
       "invocationPolicy": "explicit-only",
       "frontloadCharacters": 360,
