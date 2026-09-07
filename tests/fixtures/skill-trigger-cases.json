@@ -186,15 +186,19 @@
       ],
       "positivePrompts": [
         "Implement the requested repository change and verify it.",
-        "Review this codebase for regressions before release."
+        "Review this codebase for regressions before release.",
+        "Explain why this component's useEffect runs twice in development.",
+        "这个 README 的安装说明不清楚，帮我改一下。"
       ],
       "paraphrasePrompts": [
         "请在这个仓库里修复问题并完成验证。",
-        "Update the project documentation to match the current implementation."
+        "Update the project documentation to match the current implementation.",
+        "继续刚才的修复，沿用已选工作区和直接相关验证范围。"
       ],
       "negativePrompts": [
         "Translate this one sentence into Chinese.",
-        "What time is it in Singapore?"
+        "What time is it in Singapore?",
+        "Even though a repository is open, just translate this greeting: good morning."
       ],
       "explicitInvocations": {
         "amp": "/roxis-way",

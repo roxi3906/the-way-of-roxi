@@ -1,7 +1,7 @@
 interface:
   display_name: "Roxi's Way"
-  short_description: "Enforce delivery rules and context-aware output language"
-  default_prompt: "Use $roxis-way to perform this repository task, inspect each output destination before writing, select the language of every output independently from local conventions, and follow all workspace, implementation, validation, Git, PR, and code comment rules."
+  short_description: "Route repository work and preserve authorized task choices"
+  default_prompt: "Use $roxis-way for this repository task, apply the route that matches the requested outcome, reuse established task choices, and check destination language, authorization, and verification before the relevant actions."
 
 policy:
   allow_implicit_invocation: true
