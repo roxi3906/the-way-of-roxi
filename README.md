@@ -148,7 +148,11 @@ npx skills add roxi3906/the-way-of-roxi --list
 
 `roxis-way` defines defaults for:
 
-- Collaboration language
+- Intent-based activation from repository context, including implicit follow-ups and Chinese requests; an unrelated request inside a repository stays outside the workflow
+- Separate routes for read-only answers, artifact changes, task continuation, Git delivery, and merged-delivery cleanup
+- Reuse of established workspace, validation, and action-specific authorization, including the scoped choices supplied by explicitly selected `auto-develop`
+- Action checkpoints before writing, validating, Git operations, cleanup, and reporting; unrun checks remain unverified
+- English skill source with replies, questions, progress updates, and reports in the user's preferred language
 - Context-aware language selection for each output destination
 - Planning artifact placement
 - Git conventions and PR authorization
@@ -206,6 +210,8 @@ npm run verify
 ```
 
 `npm test` validates structured metadata, host invocation profiles, positive and negative trigger contracts, manual-only controls, per-agent installations for all 14 supported agents, and the combined `--copy` quick-install path across every documented catalog root. Installation verification parses each copied `auto-develop` bundle and requires the portable intent contract plus the `disable-model-invocation`, OpenCode, and Codex native controls to survive unchanged. `npm run verify:codex` additionally launches fresh, isolated, read-only Codex sessions for explicit and negative Auto Develop behavior, the repository workflow, TAPD Sync lifecycle, and explicit-only summary behavior. Single-turn cases remain ephemeral. The Auto Develop stateful case resumes one temporary session from a durable-ledger midpoint through a final report, a separate delivery, risk-gate pause and continuation, and an ordinary question; it then opens a fresh thread with an inherited parent summary and verifies that the earlier activation does not carry over. The TAPD Sync lifecycle case separately resumes one temporary session across the first match, a dormant reply, and candidate selection. Capable-adapter cases expose only a bundled read-only TAPD fixture and reject non-TAPD commands or write-like TAPD commands, while unavailable and negative cases reject all tool activity. The online smoke copies only the current `CODEX_HOME` authentication into an isolated temporary home, exposes no host credentials or live TAPD configuration to model tools, and fails clearly when Codex is not authenticated. Runtime activation behavior for other agents is documented from their product guidance; this repository verifies their locked CLI installation artifacts rather than launching authenticated sessions for every product.
+
+Focused Roxi's Way behavior checks can be run with `npm run verify:codex -- --case roxis-way-readonly`, `--case roxis-way-authorized`, or `--case roxis-way-negative`. They cover an implicit Chinese code question, two turns sharing explicitly selected strategies, and an unrelated translation. The first two probes ask for decision records and check route, required user choices, and selected branch and verification state where applicable. The existing `roxis-way` and cleanup cases continue to check missing-choice prompts and cleanup approval. These isolated probes do not assess explanation quality or prove unrestricted conversation behavior, coactivation with `auto-develop`, or adherence on every host or prompt.
 
 ## License
 

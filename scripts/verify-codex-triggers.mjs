@@ -36,6 +36,10 @@ const tapdInitializationReads = [
   "work-items-list-tasks",
 ];
 
+// Probe schemas constrain formatting, but leave every workflow decision to the evaluated skill.
+const readonlyDecisionFormat = '本次只记录你会如何处理这个请求的流程决策，不输出解释正文。在技能激活标记之后，只输出一个 JSON 对象，不加其他文字，字段为 route（readonly 或 change）、needsUserChoice（布尔值）。';
+const continuationDecisionFormat = '在技能激活标记之后，只输出一个 JSON 对象，不加其他文字，字段为 route（readonly 或 change）、branch（实际选定分支，未定为空字符串）、validationScope（none、direct、indirect 或 full）、validationState（not-run、passed 或 failed）、needsUserChoice（布尔值）、nextAction（inspect、edit、validate 或 wait-for-choice，表示后续允许执行操作时的下一步）。';
+
 const triggerCases = [
   {
     id: "auto-develop-negative",
@@ -121,13 +125,51 @@ const triggerCases = [
   {
     id: "roxis-way",
     evalName: "eval-roxis-way",
-    prompt: "Without running tools or editing files, start a small README clarification task and present the repository workflow choices required before planning.",
+    prompt: "Without running tools or editing files, start a small README clarification task and present the repository workflow choices required before planning. My preferred response language is Simplified Chinese.",
+  },
+  {
+    id: "roxis-way-language-en",
+    sourceSkillId: "roxis-way",
+    evalName: "eval-roxis-way-language-en",
+    prompt: "我的回复语言偏好是英文。不要运行工具或编辑文件，开始一个 README 修订任务，并列出规划前需要选择的工作区和验证策略。",
   },
   {
     id: "roxis-way-cleanup",
     sourceSkillId: "roxis-way",
     evalName: "eval-roxis-way-cleanup",
     prompt: "Without running tools or changing anything, prepare the cleanup plan for merged PR #42. Assume its feat/docs branch and /tmp/feat-docs worktree remain, and the delivery was bound to TAPD work item STORY-42 whose current status is In Progress and type is STORY. Current project workflow metadata resolves that type's successful terminal state to status_9, displayed as Verified Done. The project-management adapter is named pmctl; its exact read command is `pmctl workflow terminal --item STORY-42`, and its exact mutation command is `pmctl work-item transition --id STORY-42 --to status_9`. The user has not requested an alternate status. Include the local resources, proposed platform action, and exact read and mutation commands in the cleanup plan, explain how an alternate user request would change that action, and wait for explicit approval before execution.",
+  },
+  {
+    id: "roxis-way-readonly",
+    sourceSkillId: "roxis-way",
+    evalName: "eval-roxis-way-readonly",
+    prompt: `不运行工具、不修改文件。解释这个仓库组件的 useEffect 为什么在开发模式下可能执行两次，以及依赖数组如何影响重复执行。${readonlyDecisionFormat}`,
+  },
+  {
+    id: "roxis-way-authorized",
+    sourceSkillId: "roxis-way",
+    evalName: "eval-roxis-way-authorized",
+    mode: "stateful",
+    turns: [
+      {
+        behavior: "roxis-way-authorized",
+        toolPolicy: "none",
+        prompt: `这个 README 修订任务选择在当前工作区的 codex/docs 分支继续，验证只做直接相关检查。不运行工具、不修改文件；说明接下来如何处理，以及目前验证处于什么状态。${continuationDecisionFormat}`,
+      },
+      {
+        behavior: "roxis-way-authorized",
+        toolPolicy: "none",
+        prompt: `继续刚才的 README 任务，先简述下一步和验证状态。仍然不运行工具、不修改文件。${continuationDecisionFormat}`,
+      },
+    ],
+  },
+  {
+    id: "roxis-way-negative",
+    sourceSkillId: "roxis-way",
+    evalName: "eval-roxis-way-negative",
+    mode: "negative",
+    negativeAssertion: "roxis-way",
+    prompt: "不运行工具。把这句日常问候翻译成中文：Good morning, have a nice day.",
   },
   {
     id: "roxis-way-cleanup-lifecycle",
@@ -1968,16 +2010,46 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     return;
   }
 
-  if (caseId === "roxis-way") {
+  if (caseId === "roxis-way" || caseId === "roxis-way-language-en") {
     const chineseCharacters = output.match(/[\u3400-\u9fff]/g) || [];
     const numberedChoices = output.match(/^\s*[1-4][.、]\s+\S.+$/gm) || [];
+    const english = caseId === "roxis-way-language-en";
+    const languageMatches = english
+      ? chineseCharacters.length === 0 && /workspace/i.test(output) && /validation/i.test(output)
+      : chineseCharacters.length >= 30 && /工作区/.test(output) && /(验收|验证)/.test(output);
     if (
-      chineseCharacters.length < 30 ||
       numberedChoices.length < 8 ||
-      !/工作区/.test(output) ||
-      !/(验收|验证)/.test(output)
+      !languageMatches
     ) {
-      throw new Error("roxis-way did not return Chinese workspace and validation choice lists");
+      throw new Error(`roxis-way did not return ${english ? "English" : "Chinese"} workspace and validation choice lists`);
+    }
+    return;
+  }
+
+  if (caseId === "roxis-way-readonly" || caseId === "roxis-way-authorized") {
+    // Parse the entire record so an extra contradictory claim cannot hide beside valid fields.
+    const json = output.replace(`SKILL_ACTIVATED: ${activationMarker}`, "").trim()
+      .replace(/^```json\s*([\s\S]*?)\s*```$/, "$1");
+    const decision = JSON.parse(json);
+    // JSON.parse validates syntax; YAML's JSON schema additionally rejects duplicate keys.
+    YAML.parse(json, { schema: "json", uniqueKeys: true });
+    const expectedKeys = caseId === "roxis-way-readonly"
+      ? ["route", "needsUserChoice"]
+      : ["route", "branch", "validationScope", "validationState", "needsUserChoice", "nextAction"];
+    if (!decision || Array.isArray(decision) || Object.keys(decision).sort().join() !== expectedKeys.sort().join()) {
+      throw new Error("roxis-way did not return the complete decision record");
+    }
+    if (decision.needsUserChoice !== false) throw new Error("roxis-way repeated a development gate");
+    if (caseId === "roxis-way-readonly") {
+      if (decision.route !== "readonly") {
+        throw new Error("roxis-way did not select the read-only route");
+      }
+    } else if (
+      decision.route !== "change" || decision.branch !== "codex/docs" ||
+      decision.validationScope !== "direct" || decision.validationState !== "not-run" ||
+      decision.nextAction !== "inspect"
+    ) {
+      throw new Error("roxis-way lost the selected strategy or overstated verification");
     }
     return;
   }
@@ -2980,6 +3052,11 @@ const runTriggerCase = async (triggerCase) => {
         const negativeAssertions = {
           "auto-develop": assertAutoDevelopNotTriggered,
           "tapd-summary": assertSummaryNotTriggered,
+          "roxis-way": (output, marker) => {
+            if (output.includes(`SKILL_ACTIVATED: ${marker}`) || /工作区|工作树|验证范围/.test(output)) {
+              throw new Error("unrelated request unexpectedly activated roxis-way");
+            }
+          },
         };
         const negativeAssertion = turn.negativeAssertion || triggerCase.negativeAssertion;
         if (negativeAssertion) {
