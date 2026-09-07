@@ -4219,6 +4219,7 @@ test("Codex trigger verification can select one case without weakening the defau
       "auto-develop-risk",
       "auto-develop-blocked",
       "roxis-way",
+      "roxis-way-language-en",
       "roxis-way-cleanup",
       "roxis-way-readonly",
       "roxis-way-authorized",

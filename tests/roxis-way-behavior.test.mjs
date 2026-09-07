@@ -4,6 +4,14 @@ import { assertTriggerBehavior, selectTriggerCases } from "../scripts/verify-cod
 
 const marked = (decision) => `SKILL_ACTIVATED: eval-roxis-way\n${JSON.stringify(decision)}`;
 
+test("an English preference is honored for workflow choices even in a Chinese request", () => {
+  const answer = "SKILL_ACTIVATED: eval-roxis-way\nWorkspace strategy\n1. Worktree\n2. New branch\n3. Current branch\n4. Other\nValidation scope\n1. Direct checks\n2. Indirect checks\n3. Full suite\n4. Other";
+  assert.doesNotThrow(() => assertTriggerBehavior("roxis-way-language-en", answer, "eval-roxis-way"));
+  assert.throws(() => assertTriggerBehavior("roxis-way-language-en", answer.replace("Workspace strategy", "工作区策略"), "eval-roxis-way"));
+  assert.throws(() => assertTriggerBehavior("roxis-way-language-en", "SKILL_ACTIVATED: eval-roxis-way\nChoose a workspace.", "eval-roxis-way"));
+  assert.equal(selectTriggerCases("roxis-way-language-en")[0].sourceSkillId, "roxis-way");
+});
+
 test("read-only repository questions select the read-only route without a development gate", () => {
   const decision = { route: "readonly", needsUserChoice: false };
   assert.doesNotThrow(() => assertTriggerBehavior("roxis-way-readonly", marked(decision), "eval-roxis-way"));

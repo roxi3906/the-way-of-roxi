@@ -125,7 +125,13 @@ const triggerCases = [
   {
     id: "roxis-way",
     evalName: "eval-roxis-way",
-    prompt: "Without running tools or editing files, start a small README clarification task and present the repository workflow choices required before planning.",
+    prompt: "Without running tools or editing files, start a small README clarification task and present the repository workflow choices required before planning. My preferred response language is Simplified Chinese.",
+  },
+  {
+    id: "roxis-way-language-en",
+    sourceSkillId: "roxis-way",
+    evalName: "eval-roxis-way-language-en",
+    prompt: "我的回复语言偏好是英文。不要运行工具或编辑文件，开始一个 README 修订任务，并列出规划前需要选择的工作区和验证策略。",
   },
   {
     id: "roxis-way-cleanup",
@@ -2004,16 +2010,18 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     return;
   }
 
-  if (caseId === "roxis-way") {
+  if (caseId === "roxis-way" || caseId === "roxis-way-language-en") {
     const chineseCharacters = output.match(/[\u3400-\u9fff]/g) || [];
     const numberedChoices = output.match(/^\s*[1-4][.、]\s+\S.+$/gm) || [];
+    const english = caseId === "roxis-way-language-en";
+    const languageMatches = english
+      ? chineseCharacters.length === 0 && /workspace/i.test(output) && /validation/i.test(output)
+      : chineseCharacters.length >= 30 && /工作区/.test(output) && /(验收|验证)/.test(output);
     if (
-      chineseCharacters.length < 30 ||
       numberedChoices.length < 8 ||
-      !/工作区/.test(output) ||
-      !/(验收|验证)/.test(output)
+      !languageMatches
     ) {
-      throw new Error("roxis-way did not return Chinese workspace and validation choice lists");
+      throw new Error(`roxis-way did not return ${english ? "English" : "Chinese"} workspace and validation choice lists`);
     }
     return;
   }

@@ -152,7 +152,7 @@ npx skills add roxi3906/the-way-of-roxi --list
 - Separate routes for read-only answers, artifact changes, task continuation, Git delivery, and merged-delivery cleanup
 - Reuse of established workspace, validation, and action-specific authorization, including the scoped choices supplied by explicitly selected `auto-develop`
 - Action checkpoints before writing, validating, Git operations, cleanup, and reporting; unrun checks remain unverified
-- Collaboration language
+- English skill source with replies, questions, progress updates, and reports in the user's preferred language
 - Context-aware language selection for each output destination
 - Planning artifact placement
 - Git conventions and PR authorization

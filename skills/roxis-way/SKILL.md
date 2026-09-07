@@ -1,11 +1,13 @@
 ---
 name: roxis-way
-description: Apply Roxi's workflow to repository and codebase tasks, including coding, debugging, review, explanation, planning, documentation, testing, Git and PR work (修复、排查、审查、解释代码、改文档、验证、提交). Use the current request and ongoing task context even when no repo or skill is named. Route read-only questions, changes, delivery and cleanup to the relevant rules; preserve existing task choices and authorization. Do not use for casual conversation, standalone translations, time queries, or requests unrelated to repository work; merely being in a repo is not a trigger.
+description: Apply Roxi's workflow to repository and codebase tasks, including coding, debugging, review, explanation, planning, documentation, testing, Git and PR work. Recognize equivalent intent across languages, using the current request and ongoing task context even when no repo or skill is named. Route read-only questions, changes, delivery and cleanup to the relevant rules; preserve existing task choices and authorization. Do not use for casual conversation, standalone translations, time queries, or requests unrelated to repository work; merely being in a repo is not a trigger.
 ---
 
 # Roxi's Way
 
 Apply the relevant rules to the requested repository work. Skill activation does not itself authorize edits, commits, pushes, pull requests, or cleanup.
+
+Maintain this skill's instructions and metadata in English. This authoring convention does not determine the language of its outputs; follow the user's applicable language preferences through Output Language Selection.
 
 ## Start Here
 
@@ -26,7 +28,7 @@ If a read-only request later becomes an edit, resolve the missing edit choices a
 
 ## Authorization And Continuity
 
-- System and host rules, repository instructions, and explicit user requirements take precedence over this skill's defaults. A requested output language overrides the conversational Chinese default.
+- System and host rules, repository instructions, and explicit user requirements take precedence over this skill's defaults. Preserve the user's applicable language preferences; do not infer an English output preference from this skill's source language.
 - Treat a user's explicit strategy or a valid task-scoped authorization from an explicitly selected workflow as satisfying the corresponding choice. For example, active `auto-develop` supplies its dedicated-worktree strategy, risk-based validation choice, commit/push/draft-PR authorization, and recorded source branch as PR base for the current delivery. Follow that workflow without repeating those questions. Never infer its activation from ordinary words such as "automatic development".
 - Loading `roxis-way`, finding a matching branch, or receiving a general request to finish does not supply missing action-specific authorization. Preserve credentials, named-VM approval, and the reviewed cleanup-plan boundary; delivery authorization does not approve cleanup.
 - Keep the current task's repository/worktree, branch, selected validation scope, authorized actions, PR base when known, and remaining checks in trusted task context or an existing private plan/ledger. Do not create a separate state file just to follow this skill. After compaction, restore only choices backed by that same task's preserved evidence; inspect live Git state before mutating it and ask only for an indispensable choice that cannot be recovered.
@@ -47,7 +49,7 @@ If a read-only request later becomes an edit, resolve the missing edit choices a
 
 ## Hard Rules
 
-- When this skill applies, use Simplified Chinese for replies to the user.
+- Use the user's preferred language for replies, questions, progress updates, and reports, as resolved through Output Language Selection.
 - Inspect every output destination before writing or revising it, then apply Output Language Selection; make this decision for each output independently, even when one task produces multiple artifacts.
 - Never use the current conversation language as the primary language evidence for a non-conversational output.
 - For artifact changes, resolve missing workspace and validation choices through Collaboration before writing; apply Authorization And Continuity first.
@@ -64,9 +66,10 @@ If a read-only request later becomes an edit, resolve the missing edit choices a
 
 Trigger: Apply before creating or revising any reply, code comment, pull request title or body, plan, checklist, spec, architecture document, development proposal, data-analysis result, UI copy, developer-facing message, or other artifact.
 
-- Do not write or revise the output until its language has been selected.
+- For conversational outputs, follow the user's current explicit language instruction, then an established user preference from trusted context, then the language of the current user message. Do not ask for a language choice when that evidence is sufficient.
+- For non-conversational outputs, do not write or revise the output until its language has been selected. A preference applies only to the outputs within its stated scope; a preference for replies alone does not override a product's locale.
 - For each output or independently governed part of an output, choose the language in this order and stop at the first decisive source:
-  1. Follow the user's explicit language instruction for that specific output.
+  1. Follow the user's current explicit language instruction for that output, then any established user preference that covers it.
   2. Follow binding rules or templates that govern the output destination, such as repository instructions, contribution guides, document templates, or platform requirements.
   3. Use the dominant language of the same content type at the exact output destination.
   4. If local evidence is insufficient, expand outward to the nearest relevant scope and inspect the same content type there.
@@ -75,19 +78,19 @@ Trigger: Apply before creating or revising any reply, code comment, pull request
 - Decide the language for each output independently. Files produced by the same task may use different languages when their destinations differ.
 - Evaluate independently governed parts separately. In particular, evaluate a PR title and body separately because a repository may use different language conventions for each.
 - When evidence is sparse or mixed, inspect additional nearby examples before using a fallback; do not call a language dominant without a clear pattern.
-- The current conversation language may govern direct replies under Collaboration, but it is not primary evidence for repository artifacts or other non-conversational outputs.
+- A message's language alone is not an instruction to translate project artifacts. Use it as a last fallback only when no applicable preference or destination convention exists.
 - Use these artifact-specific contexts and fallbacks:
-  - For code comments, inspect the target file first, then nearby comments and similar files; if no pattern is clear, use Simplified Chinese.
-  - For plans, specs, architecture documents, development proposals, and data-analysis results, inspect same-type documents in the target directory first, then the nearest related documentation scope; if no pattern is clear, use Simplified Chinese.
-  - For pull requests, inspect recent comparable PRs in the target repository and assess the PR title and body separately; if no pattern is clear, use an English conventional-commit title and a Simplified Chinese body.
+  - For code comments, inspect the target file first, then nearby comments and similar files; if no pattern is clear, use the user's preferred output language, falling back to the current user message's language.
+  - For plans, specs, architecture documents, development proposals, and data-analysis results, inspect same-type documents in the target directory first, then the nearest related documentation scope; if no pattern is clear, use the user's preferred output language, falling back to the current user message's language.
+  - For pull requests, inspect recent comparable PRs in the target repository and assess the PR title and body separately; if no pattern or applicable preference exists, use an English conventional-commit title and the user's conversational language for the body.
   - For product-facing text, inspect project language rules and nearby product copy; if no pattern is clear, use English.
-  - For other project artifacts, inspect same-type outputs at the destination, then the project's dominant developer-facing language; if no pattern is clear, use Simplified Chinese.
+  - For other project artifacts, inspect same-type outputs at the destination, then the project's dominant developer-facing language; if no pattern is clear, use the user's preferred output language, falling back to the current user message's language.
 
 ## Collaboration
 
 Trigger: Apply the start-choice procedure only when the selected route will create or revise a project artifact and a required strategy remains unresolved. Read-only discovery to resolve those choices is allowed first.
 
-- When replying to the user in this repository, communicate in Simplified Chinese.
+- Localize replies and choice lists into the user's preferred language through Output Language Selection.
 - Prioritize functional implementation and verification over commit packaging, branch cleanup, or presentation work.
 - Before asking the user to choose a workspace strategy, inspect local branches and branches already checked out in git worktrees. Compare those branch names with the user's task description using concrete identifiers from the request, such as feature names, bug IDs, ticket numbers, product areas, module names, and meaningful keywords.
 - When the user's task describes a pull request, PR URL, PR number, or PR conflict resolution, inspect the PR metadata before ranking workspace candidates. Use the PR head branch as the strongest match key, the base branch as required conflict context, and the PR title or description as secondary keywords. If the head branch exists in a local branch or git worktree, rank that exact match first. If the head branch only exists as a remote-tracking branch, present it as a candidate that would require creating or checking out a local workspace. If the PR comes from a fork, present the fork owner and head ref and state that fetching the fork branch may be required before work can start.
@@ -117,7 +120,7 @@ Trigger: Apply this section when creating or moving any in-progress plan, checkl
 - Name each in-progress plan file with the current date and a concise summary of the planned changes, such as `YYYY-MM-DD-update-payment-retry-plan.md`.
 - When an in-progress plan changes materially, rename the file so its date and summary still match the latest revision and planned changes.
 - Keep those in-progress planning artifacts out of git. Only update `.gitignore` when needed to keep them untracked.
-- Select the language of every development plan, task breakdown, spec, or other planning document through Output Language Selection. Inspect same-type artifacts in the target private directory first, then the nearest project planning or documentation scope; use Simplified Chinese only when no clear precedent exists.
+- Select the language of every development plan, task breakdown, spec, or other planning document through Output Language Selection, including its user-preference and destination-convention precedence.
 - Only move a plan into tracked `docs/`, `specs/`, or another shared location when the user explicitly asks for a shared, reviewable, or long-term document.
 
 ## Git And PR Conventions
@@ -140,7 +143,7 @@ Trigger: Apply this section when committing, naming branches, force-adding ignor
 - Verify that the user's selected target branch exists before using it.
 - Before drafting pull request content, inspect recent comparable pull requests in the target repository and select the language for the PR title and body separately through Output Language Selection.
 - Preserve any repository-required pull request title format. When no clear local language precedent exists, use an English conventional commit title such as `feat: add admin login` or `fix: resolve payment timeout`.
-- When no clear local language precedent exists for the pull request body, use Simplified Chinese.
+- When no clear local language precedent exists for the pull request body, use the applicable user preference or the conversational language fallback from Output Language Selection.
 - Structure the pull request body with standard sections equivalent to Summary, Highlights, Impact, Test Results, and Potential Issues. Write the headings in the selected body language and match established repository wording when available.
 - In the summary section, describe the change as functional outcomes or business-facing behavior rather than a plain code-file or implementation checklist.
 - Use the highlights section only for concise product-facing changes introduced by the PR. Each bullet must describe changed user or product behavior, entry points, naming, URLs, discoverability, compatibility, business capability, data behavior, integrations, or operationally relevant outcomes.
@@ -160,7 +163,7 @@ Trigger: Apply this section when cleaning up after a pull request or completed f
 
 - Before cleanup, prepare a cleanup plan for the user's review. The plan MUST list the delivery contents that make cleanup relevant, including the PR identifier or branch when available, local branches, worktrees, temporary planning artifacts, generated files, scripts, commands, repository files that the delivery created, modified, or used, and every confirmed project-management work item bound to that delivery.
 - Determine bound work items from existing session or delivery binding records, PR metadata, task artifacts, or explicit user context. Do not discover or infer a new binding merely because an unbound item looks related during cleanup.
-- For each bound work item, list its platform, stable identifier or link, current status, proposed action and target status, and the exact read and mutation commands or platform operations. If the item is nonterminal and the user gives no different requirement, default the proposed action to transition it to a successful terminal state resolved from that project's current workflow and the item's work-item type. Never assume a status label such as `Done` or `已完成` is universally terminal.
+- For each bound work item, list its platform, stable identifier or link, current status, proposed action and target status, and the exact read and mutation commands or platform operations. If the item is nonterminal and the user gives no different requirement, default the proposed action to transition it to a successful terminal state resolved from that project's current workflow and the item's work-item type. Never assume a status label such as `Done` or its localized equivalent is universally terminal.
 - A user's cleanup-specific requirement for a bound work item overrides the default terminal transition. Reflect the requested status or action in the reviewed plan before performing it.
 - If the platform or required workflow metadata is unavailable, mark the work item as leave untouched with the reason, do not claim it was cleaned up, and continue with other independent items already covered by the reviewed plan.
 - Include the exact cleanup script or command sequence with the cleanup plan, and wait for the user's explicit approval before executing it.
@@ -197,7 +200,7 @@ Trigger: Apply this section when writing, editing, adding, or substantially rewr
 - When the logic involves tricky behavior, feature rules, implementation constraints, or important tradeoffs, add a more detailed comment that explains the non-obvious part.
 - Select comment language through Output Language Selection. Match the target file's dominant existing comment language when it is clear.
 - When the target file has mixed or sparse comments, inspect the nearest surrounding comments and then similar nearby files.
-- Use Simplified Chinese only when no clear comment-language precedent exists after that inspection.
+- If no clear comment-language precedent exists, use the preference and fallback defined in Output Language Selection.
 - Do not add comments that only restate the code.
 
 ## Third-Party Packages And Component Libraries
