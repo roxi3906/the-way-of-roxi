@@ -142,17 +142,18 @@ Use only the records that describe the actual path. For example, a tracking conf
 
 Use the current session language for the terminal report. Resolve it immediately before rendering, store its language tag in `session.language`, and use it for every human-readable decision-tree heading, root label, node title, table heading, option label and description, recommendation marker, reason, risk, involvement value, and outcome. Keep JSON keys, decision and option IDs, Git refs, RFC 3339 timestamps, paths, commands, URLs, and other technical literals unchanged. Validate the expected technical literals in their corresponding tree and table fields, then exclude those literals when checking that the remaining human-readable content contains no text from another language. If ledger values were recorded before the session language changed, translate them for display without translating the stored keys.
 
-Include these sections when applicable:
+Deliver a single self-contained HTML report, following [html-report.md](html-report.md). Keep a restrained palette, readable typography, left alignment, and spacing without divider lines or decorative separator characters, except for the decision timeline's node connectors. All content must be expanded in normal page flow without collapsible content or internal scroll regions. The decision outline is the only exception: a sticky right sidebar containing local jump links to all nodes, current-entry highlighting, and optional list scrolling; narrow screens place it above the timeline. Chapter and block titles stick in separate layers while scrolling and show a subtle lower shadow only while pinned. No external fonts, CDN scripts, or network access are needed to read the report. The four main chapters are:
 
-1. **Outcome**: State whether every acceptance criterion passed or identify the exact blocker.
-2. **Delivery Context**: Show the source branch and full starting commit, task branch, worktree, tracking or monitoring result, aggregate phase synchronization and hybrid-child result, and the absolute decision-tree document path.
-3. **Implemented**: Describe observable behavior and affected business or content paths.
-4. **Verification**: List commands or checks with their final results. For every command, emit `Command: <actual command>` followed by `Result: <verified result>`. Distinguish direct, expanded, and substituted coverage.
-5. **Deep Review**: List findings by severity, the recommended fixes applied, re-review outcome, and any residual risk.
-6. **Draft PR**: Link the verified draft PR and state its base and head branches.
-7. **Decision Tree**: Render every decision object as a connected tree rooted at the user's goal in the current session language. Use the current values on each object after its verified ID-based updates; do not omit child decisions.
+1. **Task Overview**: State current progress, whether every acceptance criterion passed, or the exact blocker. Show concise task analysis, repository identity, task branch, absolute working directory, recorded start and report-cutoff times, elapsed wall-clock duration, and verified PR number, URL, draft state, base, and head. Keep supplementary context compact with the source branch, full starting commit, and tracking or monitoring result. Put session metadata and the absolute decision-ledger path in the decision chapter's audit block. Missing timing is explicitly unrecorded; a missing PR is explicitly not created.
+2. **Valuable Intermediate Stages**: Include material research findings, design choices, implemented behavior, and independently useful stage outcomes with their evidence. Omit routine command narration. Preserve verification commands and final results in this chapter: `Command: <actual command>` followed by `Result: <verified result>`, translated consistently. Distinguish direct, expanded, and substituted coverage. An empty chapter states that no valuable intermediate outcome was recorded.
+3. **Code Review and Fixes**: Pair each finding with its severity, concrete evidence, corresponding fix, repair verification, and final status. Record actual review, fix, and reverification timestamps and the latest report-level review time, including when no findings exist; leave unavailable times unrecorded. Include re-review outcome and residual risk. Distinguish a completed review with no findings from a review that has not run. Never display a pending, deferred, or unverified fix as resolved.
+4. **Decision Tree**: Render every decision object once as a vertical timeline rooted at the user's goal, with creation/update times above its title and all details inline. Preserve execution order, child decisions, type, parent references, IDs, and every field previously shown in the details table. List all options with full descriptions and IDs, using independent recommendation and selection tags. Both tags may mark the same option; keep every alternative visible. The HTML is a presentation of the current ledger, never a replacement or a schema migration. Preserve schema/session/task metadata, all applicable final status records, aggregate phase synchronization, per-event payloads, and hybrid-child results in an always-expanded audit block in this chapter.
 
-Render the tree in execution order and include every delivery phase. The English example below illustrates structure, not fixed display copy:
+The HTML is the detailed delivery record, served live by the task-owned Node service and retained as an offline snapshot. Default chat closeout is one short outcome sentence plus one compact line of links to the verified live URL, offline HTML, original JSON, and verified draft PR when available. Add a short sentence for any blocker, material residual risk, or necessary user action, and the cleanup reminder after verified draft-PR creation. Do not repeat report sections, implementation lists, validation counts or commands, review details, or worktree metadata. These brevity rules change presentation, not the required work or evidence. Follow an explicit request for detail; when the user requests text-only output or prohibits report file creation, retain the evidence contract in text and state that no HTML artifact was generated. If report delivery fails, disclose the failure and give the essential result or blocker directly; never imply an unavailable artifact was delivered.
+
+### Text-Only Simulation Compatibility
+
+The following tree and table examples apply only when the user explicitly requests a text-only simulation. Real HTML reports use the timeline above, retaining the same decision fields and evidence. For text-only output, use these audit sections in order: Outcome, Delivery Context, Implemented, Verification, Deep Review, Draft PR, Decision Tree. Follow the tree with the full Markdown decision-details table below. Render the tree in execution order and include every delivery phase. The English example below illustrates structure, not fixed display copy:
 
 ```text
 User goal
@@ -167,7 +168,7 @@ User goal
 `- D-08 Draft PR
 ```
 
-Follow the tree with this decision-details table. Populate every cell for every decision. Translate the table headings and human-readable values consistently into the current session language. When only one credible path exists, list it as option `1.`, explain it, and mark it as recommended. Never use a default placeholder in the rendered table; typed defaults belong only to JSON content that has not yet been generated, while terminal decisions must be complete.
+For text-only simulations, follow the tree with this Markdown decision-details table. Populate every cell for every completed decision. Translate the table headings and human-readable values consistently into the current session language. When only one credible path exists, list it as option `1.`, explain it, and mark it as recommended. Never use a default placeholder for completed decisions. On a risk-gate pause, preserve unfinished typed defaults in JSON and display them honestly as pending or unrecorded, without inventing an outcome.
 
 ```text
 | Node | Created at | Trigger | Evidence | Options | Recommendation | Selection | Reason | Risk | Reversibility | User involvement | Outcome |
@@ -186,17 +187,25 @@ Include one table row for every tree node, including child decisions, in the sam
 
 Do not invent branches or evidence that were not considered during execution.
 
-Before emitting the terminal response, re-read this contract and the ledger, then verify all of the following:
+### Report Preflight
 
+Before emitting the terminal response, re-read this contract and the ledger, then verify all of the following for the active output format:
+
+- the HTML report exists at an absolute private path, opens offline, and contains all four chapters; its content matches the ledger and verified presentation inputs;
+- any linked live service reports the expected instance/input paths, latest revision, and no update error; its management state stays private and outside Git;
+- the HTML, its presentation input, and the original ledger remain ignored and untracked unless the user explicitly requested specific artifacts in Git;
+- elapsed time comes from recorded start and cutoff timestamps, with waiting time included; unavailable timing is not inferred from decision timestamps;
+- every review finding remains paired with its fix or explicit unresolved disposition and actual verification evidence;
 - the decision-ledger read-back record contains its absolute private JSON path ending in `-decision-tree.json`;
 - the complete file parses as JSON with `schemaVersion: 1`, the exact fixed root and nested keys, the required typed defaults, and no `null` values;
 - the session and task objects record the available session ID, session name, current session language, task summary, and ledger path;
 - the Git-state record proves the default ignored, untracked, and commit-excluded state or the exact explicit-user exception;
 - every decision has a unique immutable ID, and every later change read back from the same object selected by that ID;
-- every decision row contains its original valid RFC 3339 creation time;
+- every timeline entry or text-only decision row contains its original valid RFC 3339 creation time;
 - every option list is consecutively numbered, gives every option a meaningful explanation, marks exactly one recommendation, and matches the explicit `Recommendation` and `Selection` option references;
-- every stored decision appears once in the tree and once in the table;
-- every table cell is populated and every outcome uses the latest verified update;
+- every stored decision appears once in the HTML timeline, with its parent reference when present; text-only simulations instead contain one tree node and one table row per decision;
+- every completed decision's detail fields are populated and every outcome uses the latest verified update;
+- all HTML content is directly readable without collapsed content, with links and optional list scrolling limited to the decision outline; recommended options are visually distinct from alternatives and actual selections;
 - every human-readable decision-tree label and value uses the current session language while fixed JSON keys and technical literals remain unchanged;
 - all eight delivery phases appear in order for a successful delivery;
 - every canonical project-management phase appears once in order with its attempted states and read-back result when tracking is bound;
@@ -209,8 +218,8 @@ Do not emit a terminal response until this preflight passes.
 
 ## End After a Verified Draft PR or Risk-Gate Pause
 
-When the draft PR exists and its state has been read back successfully, include the worktree path and task branch and end with this reminder:
+When the draft PR exists and its state has been read back successfully, keep the worktree path and task branch in the HTML overview, and append this short reminder once in chat:
 
 > PR 合并后，可以让我清理本地开发工作树和任务分支，以释放资源。
 
-Do not present cleanup as part of `auto-develop`. When PR creation is blocked, omit this reminder and report the exact risk-gate blocker, preserved work, and condition required to resume. Identify a human-only action only when one is actually required.
+For an explicitly requested text-only simulation, retain the worktree metadata and reminder in the text report. Do not present cleanup as part of the current `auto-develop` delivery. A later cleanup request also stops this task's report service before removing its worktree. When PR creation is blocked, omit the reminder: put preserved work and detailed evidence in the report, and state the exact blocker and condition required to resume briefly in chat. Identify a human-only action only when one is actually required.
