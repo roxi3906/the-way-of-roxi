@@ -94,8 +94,17 @@ For each delivery, `auto-develop` synchronizes preparation, technical research, 
     │   ├── SKILL.md
     │   ├── agents
     │   │   └── openai.yaml
-    │   └── references
-    │       └── execution-report.md
+    │   ├── assets
+    │   │   ├── execution-report.css
+    │   │   ├── live-report.js
+    │   │   └── sticky-headings.js
+    │   ├── references
+    │   │   ├── execution-report.md
+    │   │   └── html-report.md
+    │   └── scripts
+    │       ├── decision-ledger.mjs
+    │       ├── render-execution-report.mjs
+    │       └── serve-execution-report.mjs
     ├── roxis-way
     │   ├── SKILL.md
     │   └── agents
@@ -143,7 +152,8 @@ npx skills add roxi3906/the-way-of-roxi --list
 - Deeply reviews the completed diff, fixes every actionable in-scope recommendation, revalidates, and re-reviews
 - Stores every material decision in a fixed-shape object inside `{task-summary}-decision-tree.json`, then locates that object by its immutable ID for later updates
 - Restores the durable ledger before acting in a resumed or context-restored session
-- Reports the verified delivery with the private JSON decision-tree path and a complete tree rendered in the current session language
+- Serves a live HTML report through a task-owned mini Node service with start/status/stop commands, automatic JSON refresh, and an offline snapshot; includes repository/worktree/PR metadata, timestamped review findings and fixes, and a complete decision timeline with a clickable outline
+- Keeps report presentation inputs separate from the unchanged version-1 decision ledger; links both the HTML and original private JSON in the delivery response
 - Reminds the user that local worktree and branch cleanup can be requested after merge; cleanup is outside this Skill
 
 `roxis-way` defines defaults for:
