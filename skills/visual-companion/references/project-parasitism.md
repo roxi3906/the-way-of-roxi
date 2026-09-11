@@ -13,16 +13,16 @@ Use this reference only after the user selects in-project preview for a known re
 
 ## One Complete Change List
 
-Maintain one ordered collection for every distinct UI or UX change in the requirement. Use it to drive the toolbar, navigation, and markers so their totals and numbering agree. Treat related elements that form one change as one item; include changes revealed only in dialogs, menus, tabs, or alternate states.
+Use the task's [Stable Change Numbers](../SKILL.md#stable-change-numbers) register to maintain one ordered collection for every distinct UI or UX change in the requirement. Drive the toolbar, navigation, and markers from its active items, ordered by ascending change number. Treat related elements that form one change as one item; include changes revealed only in dialogs, menus, tabs, or alternate states.
 
 Each item needs:
 
-- A stable identity and a one-based display number.
+- An immutable, unique numeric change ID displayed as `#N`, allocated from the shared task sequence rather than a list index.
 - A short title and description of the change.
 - The page or route and the scenario that reveals it.
 - A way to activate that scenario and locate its rendered target.
 
-Keep display numbers stable while reviewing the current design. A hidden item remains in the full list and total. An intentionally removed element should point to its visible replacement, former container, or resulting layout and explain the removal.
+Keep numbers stable across revisions, reloads, and mode switches. A hidden active item remains in the full list and total. A withdrawn proposal remains retired in the register but leaves active navigation and totals; its number is never reused. A proposed removal of a product element is still an active change: point to its visible replacement, former container, or resulting layout and explain the removal.
 
 ## Floating Debug Toolbar
 
@@ -33,7 +33,7 @@ The English toolbar and marker labels below are examples; localize them accordin
 It must provide:
 
 - Previous and next buttons that select the preceding or following change. Disable previous on the first item and next on the last item; for one item both are disabled.
-- A current position indicator such as `Change 2 of 7`, plus the current item's title and description.
+- The current change number, title, and description, plus a separate position indicator such as `#5 · 2 of 7`. Position and total count active items; they are not change IDs and need not match the displayed number.
 - The complete list of changes with every number and title, a clear selected item, and direct selection of any item. A collapsible, scrollable list is acceptable; it must include items on other pages and in currently hidden states.
 - A labeled switch such as `Show markers`, enabled initially, that hides or restores all red frames and numbered chips together. Turning it off keeps the toolbar, full list, current position, and navigation usable. Preserve the switch state during navigation.
 - A visible indication that this is a preview using mock data and simulated behavior.
@@ -43,7 +43,7 @@ Selection must reveal the actual change: navigate when necessary, prepare the mo
 ## Red Frames And Numbered Chips
 
 - With markers enabled, outline every currently rendered change region with a visible red frame, including items other than the selected one. The complete list accounts for regions that are on other routes or in hidden states.
-- Put a readable chip at the top-left corner of each red frame, displaying the corresponding one-based number, for example `Change 3`. Keep the frame and chip anchored together and use the same number as the toolbar list.
+- Put a readable chip at the top-left corner of each red frame, displaying the corresponding immutable change number, for example `#3`. Keep the frame and chip anchored together and use the same number as the toolbar list.
 - Choose the smallest meaningful region that communicates the change. Multiple visible regions belonging to one item share its number; different changes must not accidentally share an identity.
 - Use outlines or non-intercepting overlays so markers do not shift layout or block clicks, typing, scrolling, or keyboard focus. Keep chips visible at viewport edges and within scrolling or clipped layouts.
 - Keep marker positions correct after scroll, resize, route changes, dialog transitions, and dynamic layout changes. Use the project's overlay/portal facilities when needed; the markers and toolbar must remain usable around dialogs and other overlay content.
@@ -54,9 +54,9 @@ Selection must reveal the actual change: navigate when necessary, prepare the mo
 Run the project in preview mode using the available local runtime and browser. Verify representative mock interactions and every change-list destination:
 
 1. The preview displays the requested changes inside the real project and uses simulated reads and writes for those flows. Inspect network activity or mock assertions to verify no corresponding real service call escapes.
-2. The full list covers the requirement; direct selection and previous/next navigation reveal the correct routes and states, with accurate numbers and boundary behavior.
+2. The full list covers the requirement; direct selection and previous/next navigation reveal the correct routes and states, with accurate numbers and boundary behavior. With a retired number between active items, navigation skips that entry while surviving IDs remain unchanged; position and total reflect only active items. New changes continue above every previously assigned number.
 3. Visible changed regions have red frames and top-left chips whose numbers match the list. Scrolling, resizing, and opening dialogs keep them aligned and interactive controls usable.
 4. The marker switch hides and restores both frames and chips while the toolbar continues to work, including across navigation.
 5. Leaving preview mode restores normal operation without the companion's mock overrides or debug UI. Run the project's relevant checks for the changed components and preview integration.
 
-Deliver the project path, launch/activation instructions or preview link, and a concise list of the demonstrated changes. State which checks passed and which could not run; simulated success is not evidence that real backend functionality has been implemented.
+Deliver the project path, launch/activation instructions or preview link, and a concise list of the demonstrated changes using their immutable numbers. Invite adjustments by those numbers. State which checks passed and which could not run; simulated success is not evidence that real backend functionality has been implemented.
