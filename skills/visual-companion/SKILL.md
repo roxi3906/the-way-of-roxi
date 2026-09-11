@@ -34,6 +34,19 @@ Keep the chosen mode for follow-up revisions of the same design until the user c
 
 The selection authorizes the corresponding design work within the current task and the host's existing permissions. It does not turn simulated behavior into a request for production business logic.
 
+## Stable Change Numbers
+
+Apply this contract to all three modes. Maintain one change register for the current task, covering every distinct proposed UI or UX change, including changes in other pages, dialogs, menus, and alternate states.
+
+- Assign each new change a unique positive integer, starting at `1` and increasing by one from the highest number ever assigned in this task. Display it as `#1`, `#2`, and so on. Use one sequence across pages, artifacts, design alternatives, and modes; never restart it for a revision or mode switch.
+- Treat a change's number as its immutable identity, not its array index or current list position. Revisions, reordering, and different views of the same change retain its number. Distinct changes receive distinct numbers; multiple regions representing the same change share its number.
+- Retire withdrawn changes without reusing their numbers or renumbering survivors. Keep their numbers and status in the register so later feedback can still be resolved. Restoring the same change restores its original number; a new replacement receives the next number.
+- Keep the register with the design artifact or existing task state, recording each number, title, status, and target or scenario. Restore it before continuing after a reload or context recovery, including retired numbers when finding the next number. If it cannot be recovered, resolve the missing mapping before assigning or interpreting numbers.
+- Show the same numbers in the complete change list, visible design annotations, and delivery summaries. Low- and high-fidelity HTML must include a numbered change list and matching labels near the affected regions without disrupting the design's layout or controls. Follow the reference's toolbar and marker requirements for in-project preview.
+- Resolve feedback such as "adjust #3" or "undo #2 and refine #5" through the register, apply the requested revision, and report the affected numbers. Clarify only an unknown number or an unclear adjustment; do not interpret a list position as a change number.
+
+For example, after assigning `#1`, `#2`, and `#3`, withdrawing `#2` leaves `#1` and `#3` active. The next new change is `#4`; revising `#3` keeps `#3`.
+
 ## Low-Fidelity HTML
 
 - Create a locally viewable HTML artifact with lightweight CSS and only the JavaScript needed to demonstrate the flow.
@@ -58,4 +71,6 @@ Read [references/project-parasitism.md](references/project-parasitism.md) when t
 
 Open the selected design through the available preview or browser tools when supported, exercise its primary flow, and inspect the rendered result. For real-project mode, also perform the mode-specific checks in its reference. Check only the selected mode; this skill does not require generating all three.
 
-Report the artifact or project entry, what can be demonstrated, and what was actually verified. Label simulated behavior clearly. If a runtime or browser is unavailable, state the unverified checks rather than calling the design visually verified. Do not append another invitation to a companion delivery.
+Check that every change has a unique number, annotations and summaries match the register, and revisions preserve existing numbers while new changes continue above the highest assigned number, including retired entries.
+
+Report the artifact or project entry, the numbered changes that can be demonstrated, and what was actually verified. Tell the user they can request adjustments by number. Label simulated behavior clearly. If a runtime or browser is unavailable, state the unverified checks rather than calling the design visually verified. Do not append another invitation to a companion delivery.
