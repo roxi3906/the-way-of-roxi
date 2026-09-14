@@ -175,9 +175,11 @@ npx skills add roxi3906/the-way-of-roxi --list
 
 `tapd-sync` coordinates TAPD tracking across a work session:
 
-- Activates for the first substantive request even when the user does not mention TAPD, and later only for an explicit parent request or an existing binding; requests delegated to `tapd-summary` remain excluded
-- Runs one read-only TAPD match before the first substantive final answer and lightly recommends a parent binding there
-- Suspends all later TAPD checks, prompts, child handling, and footers when the first exchange ends unbound without explicit parent intent
+- Recognizes work intent across languages without requiring TAPD keywords; continuations such as `继续` inherit the current task and sync mode
+- Excludes skill maintenance, quoted commands, translations, and requests delegated to `tapd-summary`; mentioning a work-item keyword alone does not start synchronization
+- Answers explicit TAPD queries read-only without binding, consuming the first-work-request opportunity, or waking dormant synchronization
+- Runs one read-only TAPD match before the first substantive work result and lightly recommends a parent binding there; clarification and workspace/test-scope questions do not consume that opportunity
+- Suspends all later automatic TAPD checks, prompts, child handling, and footers when the first exchange ends unbound without explicit parent intent
 - Reactivates only when the user later selects the first recommendation or explicitly requests parent binding or creation
 - Adapts by runtime capability to an installed TAPD skill, authenticated CLI, or environment configuration
 - Ranks up to three matching open work items at session start

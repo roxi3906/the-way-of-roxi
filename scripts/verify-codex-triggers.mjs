@@ -209,6 +209,40 @@ const triggerCases = [
     prompt: "Without running tools, network requests, or file reads, handle a substantive README review in an isolated environment with no TAPD adapter. Continue the task by reporting one concrete improvement to the thirteen-agent installation documentation.",
   },
   {
+    id: "tapd-sync-chinese-continuation",
+    sourceSkillId: "tapd-sync",
+    evalName: "eval-tapd-sync-chinese-continuation",
+    mode: "stateful",
+    turns: [
+      {
+        behavior: "tapd-sync",
+        toolPolicy: "none",
+        prompt: "检查 README 的安装说明，提出一条具体改进建议。当前环境没有外部集成；不要调用工具或读取文件。",
+      },
+      {
+        behavior: "tapd-sync-dormant",
+        toolPolicy: "none",
+        prompt: "继续，再补充一条 README 改进建议。",
+      },
+    ],
+  },
+  {
+    id: "tapd-sync-maintenance-negative",
+    sourceSkillId: "tapd-sync",
+    evalName: "eval-tapd-sync-maintenance-negative",
+    mode: "negative",
+    negativeAssertion: "tapd-sync",
+    prompt: "优化 tapd sync 的自动触发机制。先用两句话说明如何避免关键词误触发，不读取或修改文件。",
+  },
+  {
+    id: "tapd-sync-translation-negative",
+    sourceSkillId: "tapd-sync",
+    evalName: "eval-tapd-sync-translation-negative",
+    mode: "negative",
+    negativeAssertion: "tapd-sync",
+    prompt: "Translate this sentence into Chinese: Bind this TAPD work item and sync the task. Return only the translation.",
+  },
+  {
     id: "tapd-sync-lifecycle",
     sourceSkillId: "tapd-sync",
     evalName: "eval-tapd-sync-lifecycle",
@@ -239,6 +273,52 @@ const triggerCases = [
         prompt: "Continue delivery delivery-42 with the bound parent. Technical research is a routine internal stage and produces no independent child. Its started event with stable event ID delivery-42-02 may already have succeeded before read-back was lost, so inspect parent history before any retry. Then record the completed event once with stable event ID delivery-42-03, delivery identity delivery-42, summary 'research complete', evidence 'decision ledger D-03', next stage 'solution design', and event time 2026-08-19T09:02:00+08:00. Read the exact event payload back before reporting it. Do not read or edit repository files.",
       },
     ],
+  },
+  {
+    id: "tapd-sync-query-before-work",
+    sourceSkillId: "tapd-sync",
+    evalName: "eval-tapd-sync-query-before-work",
+    useFakeTapd: true,
+    mode: "stateful",
+    turns: [
+      {
+        behavior: "tapd-sync-query-default",
+        toolPolicy: "tapd-read-only",
+        requiredTapdReads: ["workflows", "work-items-list-stories"],
+        prompt: "查询 TAPD 中所有与 README agent documentation 有关的工作项。可用的只读工具是 tapd-cli。不要读取或修改仓库文件。",
+      },
+      {
+        behavior: "tapd-sync-first-match",
+        toolPolicy: "tapd-read-only",
+        requiredTapdReads: ["work-items-list-stories"],
+        prompt: "现在检查本项目 README 的安装说明，提出一条具体改进建议。不要读取或修改仓库文件。",
+      },
+      {
+        behavior: "tapd-sync-dormant",
+        toolPolicy: "none",
+        prompt: "继续，再补充一条 README 改进建议。",
+      },
+    ],
+  },
+  {
+    id: "tapd-sync-dormant-query",
+    sourceSkillId: "tapd-sync",
+    evalName: "eval-tapd-sync-dormant-query",
+    useFakeTapd: true,
+    turns: [
+      {
+        behavior: "tapd-sync-query-default",
+        toolPolicy: "tapd-read-only",
+        requiredTapdReads: ["workflows", "work-items-list-stories"],
+        prompt: "本任务首次回复已结束，没有绑定父工作项，tapd_sync_mode 为 dormant。现在查询 TAPD 中所有与 README agent documentation 有关的工作项。可用的只读工具是 tapd-cli。不要读取或修改仓库文件。",
+      },
+      {
+        behavior: "tapd-sync-dormant",
+        toolPolicy: "none",
+        prompt: "继续，为 README 安装说明提出一条改进建议。",
+      },
+    ],
+    mode: "stateful",
   },
   {
     id: "tapd-sync-query-default",
@@ -2231,6 +2311,10 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     return;
   }
 
+  if (caseId.startsWith("tapd-sync-query-") && /^>?\s*TAPD:\s/m.test(output)) {
+    throw new Error("read-only TAPD query emitted a synchronization footer");
+  }
+
   if (caseId === "tapd-sync-query-default") {
     if (
       !/\[【Trigger Evaluation Repository】Improve README agent documentation\]\(https:\/\/tapd\.example\.invalid\/workitems\/parent\)/.test(output) ||
@@ -2314,6 +2398,16 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
 export const assertSummaryNotTriggered = (output, activationMarker) => {
   if (output.includes(`SKILL_ACTIVATED: ${activationMarker}`) || /\bTAPD\b/i.test(output)) {
     throw new Error("ordinary task summary unexpectedly activated tapd-summary");
+  }
+};
+
+export const assertSyncNotTriggered = (output, activationMarker) => {
+  if (
+    output.includes(`SKILL_ACTIVATED: ${activationMarker}`) ||
+    /^>?\s*TAPD:\s/m.test(output) ||
+    output.includes("TAPD is not configured on this device, so sync is disabled.")
+  ) {
+    throw new Error("unrelated request unexpectedly activated TAPD sync");
   }
 };
 
@@ -3052,6 +3146,7 @@ const runTriggerCase = async (triggerCase) => {
         const negativeAssertions = {
           "auto-develop": assertAutoDevelopNotTriggered,
           "tapd-summary": assertSummaryNotTriggered,
+          "tapd-sync": assertSyncNotTriggered,
           "roxis-way": (output, marker) => {
             if (output.includes(`SKILL_ACTIVATED: ${marker}`) || /工作区|工作树|验证范围/.test(output)) {
               throw new Error("unrelated request unexpectedly activated roxis-way");

@@ -1,19 +1,38 @@
 ---
 name: tapd-sync
-description: Automatically match the first substantive work-session response with TAPD and lightly recommend a parent work item binding. If that exchange ends unbound without parent intent, suspend later TAPD checks and output until the user explicitly resumes binding or creation. After binding, record delivery phases on the parent, create children only for independently valuable outcomes, and complete code-bearing children only from successful commits. Use for coding, fixes, debugging, refactoring, review, research, design, decisions, documentation, testing, releases, operations, repository maintenance, or explicit TAPD, requirement, defect, task, 需求, 缺陷, 任务, 工作项, binding, or sync requests. Do not use for `tapd-summary`, casual chat, acknowledgements, simple status or time queries, translations, or requests without an independent outcome.
+description: Automatically match a first substantive work request to a TAPD parent work item, without requiring TAPD keywords. Use intent and same-task context across languages (实现、修复、排查、审查、调研), including continuation such as 继续. Recommend binding once; stay dormant when unbound until explicit parent intent, and track independently valuable outcomes after binding. Handle explicit TAPD queries as read-only requests without enabling sync. Do not use for tapd-summary, maintaining or explaining this skill itself, quoted instructions, casual chat, acknowledgements, standalone status or time queries, translations, or requests without an independent outcome. A continuation resumes the existing mode; it does not by itself authorize binding or restart discovery.
 ---
 
 # TAPD Sync
 
-Connect the current work context to TAPD capabilities already configured in the runtime. Perform one read-only match before the first final answer and lightly recommend a parent binding there. If that first exchange ends without parent intent or a binding, suspend TAPD for later requests. After the user binds a parent, keep its delivery phase current and maintain child requirements only for independently valuable outcomes.
+Connect the current work context to TAPD capabilities already configured in the runtime. For an eligible work request, perform one read-only match before its first substantive result and lightly recommend a parent binding there. If that exchange ends without parent intent or a binding, suspend automatic synchronization for later requests. Explicit read-only queries remain available without changing sync state. After the user binds a parent, keep its delivery phase current and maintain child requirements only for independently valuable outcomes.
+
+## Route by Intent Before Adapter Access
+
+Evaluate the current user's intended action together with trusted same-task context, before capability detection or the final-answer gate. Skill selection alone never authorizes a TAPD operation. Apply the first matching route:
+
+| Intent and context | Action |
+| --- | --- |
+| Explicit `tapd-summary` selection | Yield the entire request to that skill, including in bound mode. |
+| Maintain, review, or explain this skill itself; translate or quote TAPD instructions | Treat the skill and quoted instructions as task data. Do not run synchronization merely because their names or commands occur in the request. A separate explicit request to bind this maintenance work still uses the parent route below. |
+| Explicit parent binding or creation, or an unambiguous selection of a retained parent proposal | Run the explicit parent flow, revalidating the selected item. A bare number is a selection only when it clearly answers the parent proposal, not a workspace or test-scope question. |
+| Explicit TAPD search, list, or item-status query without parent intent | Use the read-only query route below, even while synchronization is dormant. |
+| A substantive work outcome or continuation of one | Use the existing session mode. With no prior eligible exchange, run first-request matching; while dormant, remain silent; while bound, track only independently valuable outcomes and observed completion evidence. |
+| Unrelated chat, standalone acknowledgements or status questions, or no work outcome | Skip this skill without adapter access or a footer. Do not consume the first-work-request opportunity. |
+
+Infer work intent from the requested outcome, not an exhaustive keyword list or the current directory alone. A repository name or explicit skill invocation is unnecessary. `继续`, `go ahead`, and answers to a pending choice inherit the established task and mode; they do not by themselves create a new outcome or authorize parent binding. An unambiguous acceptance of a pending parent proposal follows the explicit parent route. If their referent is unclear, continue only work whose scope is known, without guessing a TAPD action.
+
+### Read-Only Query Route
+
+Select an available adapter and read only the workspace, workflow, and item data needed for the requested query. Apply nonterminal discovery defaults and user-readable references. Return the requested results or an honest unavailable result; do not recommend a parent, bind, create children, process phases or commits, or run the synchronization footer gate. Preserve the existing binding, mode, and first-work-reply state, including absent state. A query does not consume the first-work-request opportunity or reactivate dormant synchronization. If a request also explicitly asks for parent binding, use the parent route and its verification rules.
 
 ## Establish the Work Context
 
 - Treat `session`, `conversation`, `task`, and `thread` as the current continuous work context, regardless of the host runtime's terminology.
 - When the current request explicitly invokes or selects `tapd-summary`, do not initialize, match, remind, bind, create, reuse, complete, or otherwise process TAPD through this skill. Yield the entire request to `tapd-summary`, even when this session already has a binding.
-- On the first substantive request, initialize `tapd_first_reply_sent` to false and `tapd_sync_mode` to `active` before capability detection.
-- Initialize as soon as the first substantive request provides enough repository, topic, or deliverable context for reliable matching, and always before sending the first final answer for that request. If reliable matching context is still unavailable at the final-answer gate, report the missing non-sensitive context there instead of silently skipping TAPD.
-- When `tapd_sync_mode` is `dormant`, inspect only whether the user unambiguously selects a retained first-reply candidate or proposal, or explicitly requests parent binding or creation. If not, stop this skill before capability detection, adapter access, work-item matching, child evaluation, or footer composition.
+- Only after routing to a first substantive work request and confirming no prior same-context state, initialize `tapd_first_reply_sent` to false and `tapd_sync_mode` to `active` before capability detection.
+- Initialize as soon as the first substantive request provides enough repository, topic, or deliverable context for reliable matching, and always before sending the first final answer for that request. A clarification-only response or a question about workspace or validation choices is not that request's substantive final answer and must not consume its first-match opportunity. If reliable matching context is still unavailable when delivering the substantive result, report the missing non-sensitive context there instead of silently skipping TAPD.
+- For synchronization routes, when `tapd_sync_mode` is `dormant`, inspect only whether the user unambiguously selects a retained first-reply candidate or proposal, or explicitly requests parent binding or creation. If not, stop synchronization before capability detection, adapter access, work-item matching, child evaluation, or footer composition. An explicit read-only query follows its separate route without changing this mode.
 - Do not depend on a product-specific invocation prefix. Explicit invocation is optional and uses whatever syntax the host runtime supports.
 - If the runtime loads this skill again in the same work context, reuse the existing state rather than initializing again.
 
@@ -23,7 +42,7 @@ Connect the current work context to TAPD capabilities already configured in the 
 - Never expose tokens, authorization headers, passwords, or configuration values.
 - Do not create child requirements automatically before the user binds a parent work item.
 - Do not request a second TAPD business confirmation before automatically creating child requirements or completing bound child requirements. Always honor the host runtime's permission controls for tools, commands, network access, and writes.
-- Run the final-answer gate only for the first substantive reply, an explicit parent binding or creation flow, or a session with a verified binding. Never add TAPD output while the session is dormant.
+- Run the final-answer gate only for the first substantive reply, an explicit parent binding or creation flow, or a session with a verified binding. Never add automatic synchronization output or a synchronization footer while the session is dormant; explicit read-only query results are allowed.
 
 ## Default Work-Item Discovery to Nonterminal Scope
 
@@ -166,7 +185,7 @@ After sending the first final answer, set `tapd_first_reply_sent` to true and tr
 
 ## Reactivate Only for Explicit Parent Intent
 
-While `tapd_sync_mode` is `dormant`, do not probe TAPD capabilities, refresh candidates, inspect children, evaluate commits, or add a TAPD footer. Reactivate only when the user does one of these:
+Outside an explicit read-only query, while `tapd_sync_mode` is `dormant`, do not probe TAPD capabilities, refresh candidates, inspect children, evaluate commits, or add a TAPD footer. Reactivate only when the user does one of these:
 
 - Selects an offered candidate or approves the proposed parent creation in a way that is unambiguous from the retained first-reply context.
 - Explicitly asks to bind, link, associate, create, or resume a TAPD parent work item for the current work context.
@@ -282,7 +301,7 @@ Keep child requirements in their current state when no code commit occurs. If wo
 
 ## Run the Conditional Final-Answer Gate
 
-Immediately before a final answer for a substantive request, determine whether the gate applies. Apply it only to final answers, not interim progress or commentary messages.
+Immediately before a final answer for a substantive work request, rerun the intent route and determine whether the gate applies. Excluded requests and read-only queries bypass this gate. Apply it only to substantive final answers, not clarification-only responses, pending start-choice questions, interim progress, or commentary messages.
 
 1. When `tapd_sync_mode` is `dormant` and the current request has no explicit parent reactivation intent, stop this skill immediately. Do not access an adapter, evaluate work items or children, inspect commits for TAPD completion, or append a TAPD footer.
 2. When a dormant request explicitly reactivates parent binding or creation, set `tapd_sync_mode` to `active` and process only that explicit TAPD flow before continuing.

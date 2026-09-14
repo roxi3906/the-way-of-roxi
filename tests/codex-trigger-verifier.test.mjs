@@ -4228,7 +4228,12 @@ test("Codex trigger verification can select one case without weakening the defau
       "roxis-way-cleanup-unavailable",
       "roxis-way-cleanup-readback-failed",
       "tapd-sync",
+      "tapd-sync-chinese-continuation",
+      "tapd-sync-maintenance-negative",
+      "tapd-sync-translation-negative",
       "tapd-sync-lifecycle",
+      "tapd-sync-query-before-work",
+      "tapd-sync-dormant-query",
       "tapd-sync-query-default",
       "tapd-sync-query-inclusive",
       "tapd-sync-query-inclusive-incomplete",
@@ -4393,4 +4398,32 @@ test("Codex trigger home copies authentication without exposing global skills or
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
+});
+
+// Mentioning TAPD in the requested content is allowed; performing sync is not.
+test("TAPD negative trigger checks distinguish content from sync side effects", async () => {
+  const { assertSyncNotTriggered } = await loadVerifier();
+  assert.doesNotThrow(() => assertSyncNotTriggered("绑定此 TAPD 工作项并同步任务。", "eval-sync"));
+  for (const output of [
+    "SKILL_ACTIVATED: eval-sync",
+    "A suggestion.\nTAPD: [Parent](https://tapd.example.invalid/workitems/parent)",
+    "TAPD is not configured on this device, so sync is disabled.",
+  ]) {
+    assert.throws(() => assertSyncNotTriggered(output, "eval-sync"), /unexpectedly activated TAPD sync/);
+  }
+});
+
+test("read-only TAPD query evidence rejects synchronization footers", async () => {
+  const { assertTriggerBehavior } = await loadVerifier();
+  const result = [
+    "SKILL_ACTIVATED: eval-query",
+    "All matching nonterminal work items:",
+    "[【Trigger Evaluation Repository】Improve README agent documentation](https://tapd.example.invalid/workitems/parent)",
+    "The default nonterminal scope was applied.",
+  ].join("\n");
+  assert.doesNotThrow(() => assertTriggerBehavior("tapd-sync-query-default", result, "eval-query"));
+  assert.throws(
+    () => assertTriggerBehavior("tapd-sync-query-default", `${result}\nTAPD: Please bind this parent.`, "eval-query"),
+    /read-only TAPD query emitted a synchronization footer/,
+  );
 });

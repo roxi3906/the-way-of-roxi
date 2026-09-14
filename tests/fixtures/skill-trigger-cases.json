@@ -237,15 +237,21 @@
       ],
       "positivePrompts": [
         "Implement this repository feature and keep the work tracked.",
-        "Fix the defect linked to this TAPD work item."
+        "Fix the defect linked to this TAPD work item.",
+        "排查这个接口为什么超时。",
+        "查询 TAPD 中与 README 安装说明有关的所有未完成工作项。"
       ],
       "paraphrasePrompts": [
         "完成这次代码审查，并同步相关需求。",
-        "Research this design decision as an independently verifiable deliverable."
+        "Research this design decision as an independently verifiable deliverable.",
+        "继续完成刚才的代码审查，沿用本任务已有的同步状态。"
       ],
       "negativePrompts": [
         "Thanks, that answers my question.",
-        "Use tapd-summary to summarize today's work."
+        "Use tapd-summary to summarize today's work.",
+        "优化 tapd sync 的自动触发机制。",
+        "解释 tapd-sync 技能的休眠规则。",
+        "Translate: Bind this TAPD work item and sync the task."
       ],
       "explicitInvocations": {
         "amp": "/tapd-sync",

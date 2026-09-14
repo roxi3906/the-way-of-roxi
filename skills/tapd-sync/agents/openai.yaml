@@ -1,6 +1,6 @@
 interface:
   display_name: "TAPD Sync"
   short_description: "Bind once, then track delivery phases"
-  default_prompt: "Use $tapd-sync to match the first response, prompt once for a parent, pause when unbound, record delivery phases on the bound parent, and maintain children only for independently valuable outcomes."
+  default_prompt: "Use $tapd-sync to route by work intent and existing session state, match the first substantive work result, recommend a parent once, keep unbound continuations dormant, answer explicit queries read-only, and track independently valuable outcomes after binding."
 policy:
   allow_implicit_invocation: true
