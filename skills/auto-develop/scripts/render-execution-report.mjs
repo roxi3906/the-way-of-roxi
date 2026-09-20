@@ -7,7 +7,7 @@ import { assertDecisionLedgerJson, readDecisionLedger } from "./decision-ledger.
 
 const copy = {
   en: {
-    report: "Execution report", overview: "Task overview", stages: "Milestones", review: "Code review & fixes", decisions: "Decision tree",
+    tracking: "Project management", report: "Execution report", overview: "Task overview", stages: "Milestones", review: "Code review & fixes", decisions: "Decision tree",
     completed: "Completed", paused: "Paused", elapsed: "Elapsed time", started: "Started", ended: "Report cutoff", pr: "Pull request",
     running: "In progress", analysis: "Analysis", repository: "Repository", workdir: "Working directory", branch: "Task branch", prNumber: "PR number", reviewedAt: "Reviewed at", fixedAt: "Fixed at", verifiedAt: "Reverified at", live: "Live updates", liveError: "Update failed; showing last valid report", disconnected: "Disconnected; reconnecting",
     notRecorded: "Not recorded", notCreated: "Not created", pending: "Pending", none: "None recorded",
@@ -20,7 +20,7 @@ const copy = {
     type: "Decision type", schema: "Schema version", sessionId: "Session ID", sessionName: "Session name", language: "Language", root: "Root decision", riskLevel: "Risk level", base: "Base branch", head: "Head branch", prState: "PR state",
   },
   zh: {
-    report: "执行结果报告", overview: "任务概览", stages: "有价值的中间阶段", review: "代码审查与修复", decisions: "决策树",
+    tracking: "项目管理", report: "执行结果报告", overview: "任务概览", stages: "有价值的中间阶段", review: "代码审查与修复", decisions: "决策树",
     completed: "已完成", paused: "已暂停", elapsed: "总耗时", started: "开始时间", ended: "报告截止时间", pr: "Pull request",
     running: "进行中", analysis: "任务分析", repository: "仓库", workdir: "工作目录", branch: "任务分支", prNumber: "PR 编号", reviewedAt: "审查时间", fixedAt: "修复时间", verifiedAt: "复验时间", live: "实时更新", liveError: "更新失败，正在显示上一次有效报告", disconnected: "连接已断开，正在重连",
     notRecorded: "未记录", notCreated: "未创建", pending: "待确定", none: "无记录",
@@ -51,6 +51,25 @@ const entries = (value, name, fields) => {
   }
 };
 
+// Tracking metadata stays structured; arbitrary evidence text is never interpreted as links.
+function validateTrackingItems(items) {
+  if (items === undefined) return;
+  entries(items, "trackingItems", ["platform", "title", "status"]);
+  for (const item of items) {
+    requireText(item.url, "trackingItems.url", true);
+    if (item.reason !== undefined) requireText(item.reason, "trackingItems.reason");
+    if (!item.url) {
+      requireText(item.reason, "trackingItems.reason");
+      continue;
+    }
+    let url;
+    try { url = new URL(item.url); } catch { throw new Error("Invalid tracking URL"); }
+    if (!/^https?:\/\//i.test(item.url) || !["http:", "https:"].includes(url.protocol) || url.username || url.password) {
+      throw new Error("Invalid tracking URL");
+    }
+  }
+}
+
 function validateTime(value, name) {
   requireText(value, name, true);
   if (value && (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/.test(value) || !Number.isFinite(Date.parse(value)))) {
@@ -77,7 +96,7 @@ export function renderExecutionReport(document, report, { live = false } = {}) {
   const language = ledger.session.language || "en";
   const baseCopy = language.startsWith("zh") ? copy.zh : language.startsWith("en") ? copy.en : undefined;
   const labels = { ...baseCopy, ...report.labels };
-  for (const key of Object.keys(copy.en)) requireText(labels[key], `labels.${key}`);
+  for (const key of Object.keys(copy.en).filter((key) => key !== "tracking")) requireText(labels[key], `labels.${key}`);
   if (!["completed", "paused", "running"].includes(report.status)) throw new Error("Invalid report status");
   requireText(report.summary, "summary");
   requireText(report.reviewSummary, "reviewSummary");
@@ -92,6 +111,10 @@ export function renderExecutionReport(document, report, { live = false } = {}) {
   entries(report.reviews, "reviews", ["severity", "finding", "fix", "verification", "status"]);
   entries(report.verification, "verification", ["command", "result"]);
   textArray(report.records, "records");
+  for (const owner of [report, ...report.stages, ...report.reviews]) {
+    validateTrackingItems(owner.trackingItems);
+    if (owner.trackingItems?.length) requireText(labels.tracking, "labels.tracking");
+  }
   const duration = elapsedTime(report, labels);
   const seen = new Set();
   for (const decision of ledger.decisions) {
@@ -128,6 +151,7 @@ export function renderExecutionReport(document, report, { live = false } = {}) {
 
   const text = (value) => escape(value || labels.pending);
   const list = (items) => items.length ? `<ul>${items.map((item) => `<li>${escape(item)}</li>`).join("")}</ul>` : `<p class="muted">${escape(labels.none)}</p>`;
+  const tracking = (items = []) => items.length ? `<div class="tracking-items"><h4>${escape(labels.tracking)}</h4><ul>${items.map((item) => `<li><span class="muted">${escape(item.platform)}</span>${item.url ? `<a href="${escape(item.url)}" target="_blank" rel="noopener noreferrer">${escape(item.title)}</a>` : `<span>${escape(item.title)}</span>`}<span>${escape(item.status)}</span>${item.reason ? `<span class="muted">${escape(item.reason)}</span>` : ""}</li>`).join("")}</ul></div>` : "";
   const badge = (value, label = labels[value]) => `<span class="badge ${value}">${escape(label)}</span>`;
   const detail = (label, html) => `<div><dt>${escape(label)}</dt><dd>${html}</dd></div>`;
   const definition = (label, value) => detail(label, text(value));
@@ -168,14 +192,15 @@ ${report.notice ? `<aside class="notice">${escape(report.notice)}</aside>` : ""}
 ${report.analysis ? `<div class="task-analysis"><h4>${escape(labels.analysis)}</h4><p>${escape(report.analysis)}</p></div>` : ""}
 <dl class="overview-context">${definition(labels.repository, report.repository || labels.notRecorded)}${definition(labels.branch, report.branch || report.pr?.head || labels.notRecorded)}${definition(labels.workdir, report.workdir || labels.notRecorded)}</dl>
 <div class="summary-facts"><dl class="summary-duration">${definition(labels.elapsed, duration)}</dl><dl>${definition(labels.started, report.startedAt || labels.notRecorded)}${definition(labels.ended, report.endedAt || labels.notRecorded)}</dl><dl>${definition(labels.prNumber, report.pr?.number ? `#${report.pr.number}` : report.pr ? labels.notRecorded : labels.notCreated)}${definition(labels.pr, report.pr?.url || labels.notCreated)}${report.pr ? definition(labels.prState, report.pr.state) : ""}</dl>${report.pr ? `<dl>${definition(labels.base, report.pr.base)}</dl>` : ""}</div>
+${tracking(report.trackingItems)}
 <div class="context"><h3 class="block-heading">${escape(labels.context)}</h3><dl class="compact-facts">${report.context.map((item) => definition(item.label, item.value)).join("")}</dl></div>
 </section>
 <section id="stages"><h2 class="chapter-heading"><span class="section-number">02</span>${escape(labels.stages)}</h2>
-${report.stages.length ? `<ol class="milestones">${report.stages.map((stage, index) => `<li><h3 class="block-heading"><span class="step">${String(index + 1).padStart(2, "0")}</span>${escape(stage.title)}</h3><p>${escape(stage.summary)}</p>${list(stage.evidence)}</li>`).join("")}</ol>` : `<p class="muted">${escape(labels.none)}</p>`}
+${report.stages.length ? `<ol class="milestones">${report.stages.map((stage, index) => `<li><h3 class="block-heading"><span class="step">${String(index + 1).padStart(2, "0")}</span>${escape(stage.title)}</h3><p>${escape(stage.summary)}</p>${list(stage.evidence)}${tracking(stage.trackingItems)}</li>`).join("")}</ol>` : `<p class="muted">${escape(labels.none)}</p>`}
 <div class="verification"><h3 class="block-heading">${escape(labels.verification)}</h3>${report.verification.length ? `<div class="checks">${report.verification.map((check) => `<div><span class="muted">${escape(labels.command)}</span><code>${escape(check.command)}</code><span class="muted">${escape(labels.result)}</span><p>${escape(check.result)}</p></div>`).join("")}</div>` : `<p>${escape(labels.none)}</p>`}</div>
 </section>
 <section id="review"><h2 class="chapter-heading"><span class="section-number">03</span>${escape(labels.review)}</h2><div class="review-times">${timestamp(labels.reviewedAt, report.reviewedAt)}</div><p>${escape(report.reviewSummary)}</p>
-${report.reviews.map((review) => `<article class="review-item"><header class="block-heading review-heading"><div class="review-times">${timestamp(labels.reviewedAt, review.reviewedAt)}${timestamp(labels.fixedAt, review.fixedAt)}${timestamp(labels.verifiedAt, review.verifiedAt)}</div><div class="review-title"><span class="severity">${escape(review.severity)}</span><h3>${escape(review.finding)}</h3>${badge(review.status)}</div></header><div class="repair"><div><h4>${escape(labels.fix)}</h4><p>${escape(review.fix)}</p></div><div><h4>${escape(labels.recheck)}</h4><p>${escape(review.verification)}</p></div></div>${list(review.evidence)}</article>`).join("")}
+${report.reviews.map((review) => `<article class="review-item"><header class="block-heading review-heading"><div class="review-times">${timestamp(labels.reviewedAt, review.reviewedAt)}${timestamp(labels.fixedAt, review.fixedAt)}${timestamp(labels.verifiedAt, review.verifiedAt)}</div><div class="review-title"><span class="severity">${escape(review.severity)}</span><h3>${escape(review.finding)}</h3>${badge(review.status)}</div></header><div class="repair"><div><h4>${escape(labels.fix)}</h4><p>${escape(review.fix)}</p></div><div><h4>${escape(labels.recheck)}</h4><p>${escape(review.verification)}</p></div></div>${list(review.evidence)}${tracking(review.trackingItems)}</article>`).join("")}
 </section>
 <section id="decisions"><h2 class="chapter-heading"><span class="section-number">04</span>${escape(labels.decisions)}</h2>
 ${timeline ? `<div class="decision-layout">${outline}<ol class="decision-timeline">${timeline}</ol></div>` : `<p>${escape(labels.emptyTree)}</p>`}

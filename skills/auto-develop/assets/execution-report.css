@@ -28,6 +28,11 @@ body { margin: 0; }
 .notice { padding: 0 0 10px; color: var(--muted); font-size: 11px; }
 .live-status { margin-bottom: 12px; color: var(--accent-text); font-size: 11px; }
 .running { background: var(--accent-soft); color: var(--accent-text); }
+.tracking-items { margin: 14px 0; }
+.tracking-items ul { list-style: none; padding: 0; margin: 0; }
+.tracking-items li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 5px 0; }
+.tracking-items a { color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.tracking-items a:focus-visible { outline: 2px solid var(--marrs-green); outline-offset: 3px; }
 .task-analysis { margin-top: 16px; font-size: 13px; }
 .overview-context { display: grid; gap: 6px; margin-top: 16px; }
 .overview-context > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 12px; }

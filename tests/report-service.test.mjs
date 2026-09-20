@@ -43,6 +43,7 @@ test('live service updates atomically, retains last valid HTML on errors, and cl
     assert.match(new TextDecoder().decode((await reader.read()).value), /revision/);
     const initial = await controlReportService('status', files.statePath);
     report.summary = 'Updated result';
+    report.trackingItems = [{ platform: 'TAPD', title: 'Delivery parent', status: 'Active', url: 'https://tracker.example.invalid/parent' }];
     await writeFile(`${files.reportPath}.tmp`, JSON.stringify(report));
     await rename(`${files.reportPath}.tmp`, files.reportPath);
     await until(async () => (await controlReportService('status', files.statePath)).revision !== initial.revision);
@@ -50,6 +51,10 @@ test('live service updates atomically, retains last valid HTML on errors, and cl
     await reader.cancel();
     assert.match(await (await fetch(url)).text(), /Updated result/);
     assert.match(await readFile(files.outputPath, 'utf8'), /Updated result/);
+    for (const html of [await (await fetch(url)).text(), await readFile(files.outputPath, 'utf8')]) {
+      assert.ok(html.includes('<a href="https://tracker.example.invalid/parent"'));
+      assert.match(html, />Delivery parent<\/a>/);
+    }
     assert.doesNotMatch(await readFile(files.outputPath, 'utf8'), /EventSource/);
     await writeFile(files.reportPath, '{unfinished');
     await until(async () => (await controlReportService('status', files.statePath)).error);

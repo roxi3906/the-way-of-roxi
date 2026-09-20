@@ -60,7 +60,7 @@ test("HTML report renders all decisions and evidence without modifying the ledge
   assert.ok(html.indexOf('id="review"') < html.indexOf('id="decisions"'));
 });
 
-test("all report content is inline with navigation limited to the decision outline", () => {
+test("legacy reports without tracking items retain inline content and outline-only navigation", () => {
   const { ledger, report } = fixture();
   const html = render(ledger, report);
   assert.doesNotMatch(html, /<(?:details|summary|button|input|select|table)\b/i);
@@ -177,6 +177,46 @@ test("report text stays inert and PR links accept only HTTP(S)", () => {
   assert.ok(!html.includes("<svg"));
   report.pr.url = "javascript:alert(1)";
   assert.throws(() => render(ledger, report), /PR URL/);
+});
+
+test("tracking links appear beside their parent, milestone and review in live and offline reports", () => {
+  const { ledger, report } = fixture();
+  const item = (title, id) => ({ platform: "TAPD", title, status: "In progress", url: `https://tracker.example.invalid/item/${id}?view=detail&from=report` });
+  report.trackingItems = [item("Delivery parent", 1)];
+  report.stages[0].trackingItems = [item("Compatibility matrix", 2)];
+  report.reviews[0].trackingItems = [item("Review remediation", 3)];
+  const before = JSON.stringify({ ledger, report });
+  for (const live of [false, true]) {
+    const html = render(ledger, report, { live });
+    for (const [section, title, id] of [["overview", "Delivery parent", 1], ["stages", "Compatibility matrix", 2], ["review", "Review remediation", 3]]) {
+      const content = html.split(`<section id="${section}">`)[1].split("</section>")[0];
+      assert.match(content, new RegExp(`<a href="https://tracker\\.example\\.invalid/item/${id}\\?view=detail&amp;from=report"[^>]*>${title}</a>`));
+      assert.match(content, /TAPD/);
+      assert.match(content, /In progress/);
+    }
+  }
+  assert.equal(JSON.stringify({ ledger, report }), before);
+});
+
+test("tracking link validation rejects unsafe URLs and keeps unavailable links honest", () => {
+  const { ledger, report } = fixture();
+  const item = { platform: "Tracker", title: '<img src=x onerror="alert(1)">', status: "Blocked", url: "" , reason: "Link lookup failed" };
+  for (const owner of [report, report.stages[0], report.reviews[0]]) {
+    owner.trackingItems = [item];
+    for (const url of ["javascript:alert(1)", "data:text/html,evil", "//tracker.invalid/42", "https://user:secret@tracker.invalid/42", "not a URL"]) {
+      item.url = url;
+      assert.throws(() => render(ledger, report), /tracking.*URL/i);
+    }
+    item.url = "";
+    const html = render(ledger, report);
+    assert.match(html, /Link lookup failed/);
+    assert.match(html, /&lt;img/);
+    assert.doesNotMatch(html, /<img|href=""/);
+    delete item.reason;
+    assert.throws(() => render(ledger, report), /tracking.*reason/i);
+    item.reason = "Link lookup failed";
+    delete owner.trackingItems;
+  }
 });
 
 test("pauses and missing timestamps do not fabricate success or elapsed time", () => {
