@@ -40,7 +40,34 @@ const tapdInitializationReads = [
 const readonlyDecisionFormat = '本次只记录你会如何处理这个请求的流程决策，不输出解释正文。在技能激活标记之后，只输出一个 JSON 对象，不加其他文字，字段为 route（readonly 或 change）、needsUserChoice（布尔值）。';
 const continuationDecisionFormat = '在技能激活标记之后，只输出一个 JSON 对象，不加其他文字，字段为 route（readonly 或 change）、branch（实际选定分支，未定为空字符串）、validationScope（none、direct、indirect 或 full）、validationState（not-run、passed 或 failed）、needsUserChoice（布尔值）、nextAction（inspect、edit、validate 或 wait-for-choice，表示后续允许执行操作时的下一步）。';
 
+// Each checkpoint is independent; prompts expose facts and the response shape, never expected actions.
+const trackingOutcomeCheckpoints = [
+  { id: "planned-research", facts: "Research starts now. A root-cause report with reproduction and acceptance checks is planned, but no artifact exists and exhaustive discovery found no matching child.", want: ["create", "now", "active", true] },
+  { id: "planned-verification", facts: "Verification starts now. A separately reviewable compatibility matrix is planned with explicit acceptance criteria, but no tests have run and no matching child exists.", want: ["create", "now", "active", true] },
+  { id: "routine-command", facts: "One routine source-file read supports an already tracked outcome; it has no separately acceptable result.", want: ["none", "none", "none", false] },
+  { id: "existing-design", facts: "Design work starts now. Discovery found exactly one open child matching the planned architecture decision, parent, type and owner. Its current status is todo.", want: ["reuse", "now", "active", true] },
+  { id: "blocked-code", facts: "An active implementation child is blocked on credentials. No commit exists.", want: ["reuse", "now", "blocked", true] },
+  { id: "resumed-code", facts: "Credentials are now available for the blocked implementation child; implementation resumes now. No commit exists.", want: ["reuse", "now", "active", true] },
+  { id: "uncommitted-code", facts: "Implementation and tests pass for an active code-bearing child, but no successful commit covers its outcome.", want: ["reuse", "now", "none", true] },
+  { id: "completed-research", facts: "An active non-code research child has its durable report and all acceptance checks verified. No Git commit exists.", want: ["reuse", "now", "successful", true] },
+  { id: "restored-completion", facts: "The same delivery resumes. Its persisted outcome-to-item binding points to a research child whose successful terminal state, identical scope, owner, parent, and completion evidence all verify. No new work is requested.", want: ["restore", "now", "none", true] },
+  { id: "ambiguous-status", facts: "A bound active child becomes blocked. Workflow metadata exposes two equally valid blocked destinations and cannot uniquely select one; an activity update and its read-back are supported.", want: ["reuse", "now", "none", true] },
+  { id: "failed-readback", facts: "An active non-code review child has a durable accepted report. Its successful completion transition is attempted, but the subsequent fetch fails after bounded retries, leaving the remote result unknown.", want: ["reuse", "now", "successful", false] },
+  { id: "restored-active-renamed", facts: "The same delivery resumes an active child. Its persisted exact-ID binding, unchanged outcome, type, parent and owner all verify, but someone changed its title. Only a progress update is needed; active is already the correct status.", want: ["restore", "now", "none", true] },
+  { id: "acceptance-after-commit", facts: "An active implementation child's earlier successful covering commit and diff are preserved and reverified. Its acceptance checks were pending then and have now passed at reconciliation. No new commit has been made.", want: ["reuse", "now", "successful", true] },
+];
+
+const trackingOutcomePrompt = (evalName, platform) => `$${evalName} Without tools or file changes, simulate independent tracking checkpoints using the selected Skill. The sole configured platform is ${platform}; do not substitute another platform. A parent is already bound and verified, this context owns writes, and project, type, owner and scope are resolved. Unless a checkpoint says otherwise, the platform exposes unique legal transitions into active, blocked and successful states, and every mutation and read-back succeeds. Choose the next operations at each checkpoint from the facts below. After the activation marker, output only a JSON array in checkpoint order. Each object has exactly id, itemAction (create = new item, reuse = update an existing bound or matched item, restore = recover a persisted exact-ID binding, none = no separate item action), timing (now, after-evidence, none), statusAction (active, blocked, successful, none; the workflow transition attempted now), verified (boolean; whether the child operation or restored binding has verified read-back). These are simulation decisions, not claims of real platform writes.\n${trackingOutcomeCheckpoints.map(({ id, facts }) => `${id}: ${facts}`).join("\n")}`;
+
 const triggerCases = [
+  ...["auto-develop", "tapd-sync"].map((skill) => ({
+    id: `${skill}-outcomes`,
+    sourceSkillId: skill,
+    evalName: `eval-${skill}-outcomes`,
+    mode: "explicit",
+    inlineReferences: skill === "auto-develop" ? ["references/tracking-outcomes.md"] : [],
+    prompt: trackingOutcomePrompt(`eval-${skill}-outcomes`, skill === "tapd-sync" ? "TAPD" : "the team's issue tracker (not TAPD)"),
+  })),
   {
     id: "auto-develop-negative",
     sourceSkillId: "auto-develop",
@@ -1413,6 +1440,26 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
     throw new Error(`${caseId} did not emit its activation marker`);
   }
 
+  if (caseId === "auto-develop-outcomes" || caseId === "tapd-sync-outcomes") {
+    // Validate the whole answer, including failed writes and duplicate outcome identities.
+    const json = output.replace(`SKILL_ACTIVATED: ${activationMarker}`, "").trim()
+      .replace(/^```json\s*([\s\S]*?)\s*```$/, "$1");
+    const decisions = JSON.parse(json);
+    YAML.parse(json, { schema: "json", uniqueKeys: true });
+    if (!Array.isArray(decisions) || decisions.length !== trackingOutcomeCheckpoints.length) {
+      throw new Error(`${caseId} omitted tracking checkpoints`);
+    }
+    for (const [index, { id, want }] of trackingOutcomeCheckpoints.entries()) {
+      const actual = decisions[index];
+      if (!actual || Object.keys(actual).sort().join() !== "id,itemAction,statusAction,timing,verified" ||
+          actual.id !== id ||
+          [actual.itemAction, actual.timing, actual.statusAction, actual.verified].some((value, field) => value !== want[field])) {
+        throw new Error(`${caseId} mishandled tracking checkpoint ${id}: ${JSON.stringify(actual)}`);
+      }
+    }
+    return;
+  }
+
   const autoDevelopReport = AUTO_DEVELOP_REPORT_CASES.has(caseId)
     ? parseAutoDevelopOutput(output)
     : undefined;
@@ -2417,7 +2464,7 @@ export const assertAutoDevelopNotTriggered = (output, activationMarker) => {
   }
 };
 
-export const createEvalSkill = async ({ sourceSkill, skillsRoot, evalName }) => {
+export const createEvalSkill = async ({ sourceSkill, skillsRoot, evalName, inlineReferences = [] }) => {
   const destination = path.join(skillsRoot, evalName);
   await mkdir(skillsRoot, { recursive: true });
   await cp(sourceSkill, destination, { recursive: true });
@@ -2437,9 +2484,13 @@ export const createEvalSkill = async ({ sourceSkill, skillsRoot, evalName }) => 
     "",
   ].join("\n");
   const body = skillContents.slice(match[0].length).replace(/^\r?\n?/, "");
+  // No-tool simulations need their selected supporting instructions in the loaded context.
+  const referenceContext = (await Promise.all(inlineReferences.map(async (reference) =>
+    `\n\n## Included Reference: ${reference}\n\n${(await readFile(path.join(sourceSkill, reference), "utf8")).trim()}`,
+  ))).join("");
   await writeFile(
     skillPath,
-    `---\n${YAML.stringify(metadata).trimEnd()}\n---\n\n${body.trimEnd()}\n${activationRule}`,
+    `---\n${YAML.stringify(metadata).trimEnd()}\n---\n\n${body.trimEnd()}${referenceContext}\n${activationRule}`,
   );
 
   const openaiPath = path.join(destination, "agents", "openai.yaml");
@@ -3021,6 +3072,7 @@ const runTriggerCase = async (triggerCase) => {
       sourceSkill: path.join(root, "skills", triggerCase.sourceSkillId || triggerCase.id),
       skillsRoot: path.join(tempRoot, ".agents", "skills"),
       evalName: triggerCase.evalName,
+      inlineReferences: triggerCase.inlineReferences,
     });
 
     const fakeBin = path.join(tempRoot, "fake-bin");

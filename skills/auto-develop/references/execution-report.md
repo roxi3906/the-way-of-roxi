@@ -132,6 +132,9 @@ Immediately after the aggregate record, emit one `Tracking phase event <stable e
 
 Emit exactly one `Tracking phase children` record when tracking is bound. List each independently acceptable outcome that created, reused, advanced, or completed a child, including its read-back result, then end with `routine stages=none`. When no stage has an independently acceptable outcome, use `independent outcomes=none; routine stages=none`. A generic stage name is not an independent outcome.
 
+Reconcile that aggregate against every planned or discovered valuable outcome, including items created before an artifact existed and completed items restored from the same delivery. Include each outcome's stable identity, acceptance criterion, verified platform/item link, actual status, progress and blocked/resumed transitions, completion evidence, and pending synchronization in the decision evidence or expanded report audit. A failed item creation or transition must appear as unsynchronized even when parent phase events succeeded; parent progress is not proof that child tracking completed. Keep routine operations on their existing item and do not report them as missing children.
+
+
 Use exactly four semicolon-delimited fields for a successful draft PR record: `URL`, `state draft`, `base`, and `head`, in that order. The head must exactly equal the recorded task branch and differ from the base. Do not append another state or a conflicting qualification.
 
 Pause evidence fields must contain concrete facts or choices. Values such as `none`, `unknown`, `TBD`, `not available`, `unspecified`, or equivalent placeholders do not satisfy the pause contract.
