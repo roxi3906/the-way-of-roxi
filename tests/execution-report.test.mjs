@@ -198,6 +198,48 @@ test("tracking links appear beside their parent, milestone and review in live an
   assert.equal(JSON.stringify({ ledger, report }), before);
 });
 
+test("summary identifies the parent and key nodes link child workflow states", () => {
+  const { ledger, report } = fixture();
+  ledger.session.language = "zh-CN";
+  const item = { platform: "TAPD", title: "已绑定任务", status: "验证中", url: "https://tracker.example.invalid/work/42" };
+  report.trackingItems = [item];
+  report.stages[0].trackingItems = [item];
+  report.reviews[0].trackingItems = [item];
+  report.decisionTracking = [{ decisionId: "D-01.1", trackingItems: [item] }];
+  const before = JSON.stringify(ledger);
+  const html = render(ledger, report);
+  const overview = html.split('<section id="overview">')[1].split("</section>")[0];
+  assert.ok(overview.indexOf("父任务") > overview.indexOf(report.summary));
+  assert.ok(overview.indexOf("父任务") < overview.indexOf('class="overview-context"'));
+  for (const section of ["stages", "review"]) {
+    const content = html.split(`<section id="${section}">`)[1].split("</section>")[0];
+    assert.match(content, /关联子任务/);
+    assert.match(content, /流转状态/);
+    assert.match(content, /<a href="https:\/\/tracker\.example\.invalid\/work\/42"[^>]*>验证中<\/a>/);
+  }
+  const parentDecision = html.split('data-decision-id="D-01"')[1].split('data-decision-id="D-01.1"')[0];
+  const childDecision = html.split('data-decision-id="D-01.1"')[1].split('</li>')[0];
+  assert.doesNotMatch(parentDecision, /已绑定任务/);
+  assert.match(childDecision, /关联子任务/);
+  assert.match(childDecision, /流转状态/);
+  assert.equal(JSON.stringify(ledger), before);
+});
+
+test("decision tracking rejects unknown or duplicate identities and unsafe item links", () => {
+  const { ledger, report } = fixture();
+  const binding = { decisionId: "D-missing", trackingItems: [] };
+  report.decisionTracking = [binding];
+  assert.throws(() => render(ledger, report), /decision tracking/i);
+  binding.decisionId = "D-01";
+  report.decisionTracking = [binding, binding];
+  assert.throws(() => render(ledger, report), /decision tracking/i);
+  report.decisionTracking = [binding];
+  binding.trackingItems = [{ platform: "Tracker", title: "Unsafe", status: "Active", url: "javascript:alert(1)" }];
+  assert.throws(() => render(ledger, report), /tracking.*URL/i);
+  report.decisionTracking = {};
+  assert.throws(() => render(ledger, report), /decisionTracking/i);
+});
+
 test("tracking link validation rejects unsafe URLs and keeps unavailable links honest", () => {
   const { ledger, report } = fixture();
   const item = { platform: "Tracker", title: '<img src=x onerror="alert(1)">', status: "Blocked", url: "" , reason: "Link lookup failed" };

@@ -7,7 +7,7 @@ import { assertDecisionLedgerJson, readDecisionLedger } from "./decision-ledger.
 
 const copy = {
   en: {
-    tracking: "Project management", report: "Execution report", overview: "Task overview", stages: "Milestones", review: "Code review & fixes", decisions: "Decision tree",
+    parentTask: "Parent task", childTasks: "Related child tasks", workflowStatus: "Workflow status", tracking: "Project management", report: "Execution report", overview: "Task overview", stages: "Milestones", review: "Code review & fixes", decisions: "Decision tree",
     completed: "Completed", paused: "Paused", elapsed: "Elapsed time", started: "Started", ended: "Report cutoff", pr: "Pull request",
     running: "In progress", analysis: "Analysis", repository: "Repository", workdir: "Working directory", branch: "Task branch", prNumber: "PR number", reviewedAt: "Reviewed at", fixedAt: "Fixed at", verifiedAt: "Reverified at", live: "Live updates", liveError: "Update failed; showing last valid report", disconnected: "Disconnected; reconnecting",
     notRecorded: "Not recorded", notCreated: "Not created", pending: "Pending", none: "None recorded",
@@ -20,7 +20,7 @@ const copy = {
     type: "Decision type", schema: "Schema version", sessionId: "Session ID", sessionName: "Session name", language: "Language", root: "Root decision", riskLevel: "Risk level", base: "Base branch", head: "Head branch", prState: "PR state",
   },
   zh: {
-    tracking: "项目管理", report: "执行结果报告", overview: "任务概览", stages: "有价值的中间阶段", review: "代码审查与修复", decisions: "决策树",
+    parentTask: "父任务", childTasks: "关联子任务", workflowStatus: "流转状态", tracking: "项目管理", report: "执行结果报告", overview: "任务概览", stages: "有价值的中间阶段", review: "代码审查与修复", decisions: "决策树",
     completed: "已完成", paused: "已暂停", elapsed: "总耗时", started: "开始时间", ended: "报告截止时间", pr: "Pull request",
     running: "进行中", analysis: "任务分析", repository: "仓库", workdir: "工作目录", branch: "任务分支", prNumber: "PR 编号", reviewedAt: "审查时间", fixedAt: "修复时间", verifiedAt: "复验时间", live: "实时更新", liveError: "更新失败，正在显示上一次有效报告", disconnected: "连接已断开，正在重连",
     notRecorded: "未记录", notCreated: "未创建", pending: "待确定", none: "无记录",
@@ -96,7 +96,11 @@ export function renderExecutionReport(document, report, { live = false } = {}) {
   const language = ledger.session.language || "en";
   const baseCopy = language.startsWith("zh") ? copy.zh : language.startsWith("en") ? copy.en : undefined;
   const labels = { ...baseCopy, ...report.labels };
-  for (const key of Object.keys(copy.en).filter((key) => key !== "tracking")) requireText(labels[key], `labels.${key}`);
+  // Older translated reports can keep their existing tracking/outcome label overrides.
+  labels.parentTask ??= labels.tracking;
+  labels.childTasks ??= labels.tracking;
+  labels.workflowStatus ??= labels.outcome;
+  for (const key of Object.keys(copy.en).filter((key) => !["tracking", "parentTask", "childTasks", "workflowStatus"].includes(key))) requireText(labels[key], `labels.${key}`);
   if (!["completed", "paused", "running"].includes(report.status)) throw new Error("Invalid report status");
   requireText(report.summary, "summary");
   requireText(report.reviewSummary, "reviewSummary");
@@ -111,9 +115,25 @@ export function renderExecutionReport(document, report, { live = false } = {}) {
   entries(report.reviews, "reviews", ["severity", "finding", "fix", "verification", "status"]);
   entries(report.verification, "verification", ["command", "result"]);
   textArray(report.records, "records");
-  for (const owner of [report, ...report.stages, ...report.reviews]) {
+  // Presentation-only bindings attach work items to immutable ledger IDs without migrating the ledger.
+  const decisionTracking = new Map();
+  if (report.decisionTracking !== undefined) {
+    entries(report.decisionTracking, "decisionTracking", ["decisionId"]);
+    const decisionIds = new Set(ledger.decisions.map((decision) => decision.id));
+    for (const binding of report.decisionTracking) {
+      if (!decisionIds.has(binding.decisionId) || decisionTracking.has(binding.decisionId)) {
+        throw new Error("Invalid decision tracking identity: unknown or duplicate decision");
+      }
+      if (!Array.isArray(binding.trackingItems)) throw new Error("Invalid decision tracking items");
+      decisionTracking.set(binding.decisionId, binding.trackingItems);
+    }
+  }
+  for (const owner of [report, ...report.stages, ...report.reviews, ...(report.decisionTracking || [])]) {
     validateTrackingItems(owner.trackingItems);
-    if (owner.trackingItems?.length) requireText(labels.tracking, "labels.tracking");
+    if (owner.trackingItems?.length) {
+      requireText(owner === report ? labels.parentTask : labels.childTasks, "labels.tracking role");
+      requireText(labels.workflowStatus, "labels.workflowStatus");
+    }
   }
   const duration = elapsedTime(report, labels);
   const seen = new Set();
@@ -151,7 +171,13 @@ export function renderExecutionReport(document, report, { live = false } = {}) {
 
   const text = (value) => escape(value || labels.pending);
   const list = (items) => items.length ? `<ul>${items.map((item) => `<li>${escape(item)}</li>`).join("")}</ul>` : `<p class="muted">${escape(labels.none)}</p>`;
-  const tracking = (items = []) => items.length ? `<div class="tracking-items"><h4>${escape(labels.tracking)}</h4><ul>${items.map((item) => `<li><span class="muted">${escape(item.platform)}</span>${item.url ? `<a href="${escape(item.url)}" target="_blank" rel="noopener noreferrer">${escape(item.title)}</a>` : `<span>${escape(item.title)}</span>`}<span>${escape(item.status)}</span>${item.reason ? `<span class="muted">${escape(item.reason)}</span>` : ""}</li>`).join("")}</ul></div>` : "";
+  const tracking = (items = [], parent = false) => {
+    if (!items.length) return "";
+    const itemLink = (item, value) => item.url
+      ? `<a href="${escape(item.url)}" target="_blank" rel="noopener noreferrer">${escape(value)}</a>`
+      : `<span>${escape(value)}</span>`;
+    return `<div class="tracking-items${parent ? " parent-tracking" : ""}"><h4>${escape(parent ? labels.parentTask : labels.childTasks)}</h4><ul>${items.map((item) => `<li><span class="tracking-identity"><span class="muted">${escape(item.platform)}</span>${itemLink(item, item.title)}</span><span class="tracking-state"><span class="muted">${escape(labels.workflowStatus)}</span>${itemLink(item, item.status)}</span>${item.reason ? `<span class="tracking-reason muted">${escape(item.reason)}</span>` : ""}</li>`).join("")}</ul></div>`;
+  };
   const badge = (value, label = labels[value]) => `<span class="badge ${value}">${escape(label)}</span>`;
   const detail = (label, html) => `<div><dt>${escape(label)}</dt><dd>${html}</dd></div>`;
   const definition = (label, value) => detail(label, text(value));
@@ -170,6 +196,7 @@ export function renderExecutionReport(document, report, { live = false } = {}) {
   }).join("")}</ol></nav>`;
   const timeline = ledger.decisions.map((decision, index) => `<li class="decision" id="decision-${index + 1}" data-decision-id="${escape(decision.id)}" data-parent-id="${escape(decision.parentId)}">
 <header class="decision-heading block-heading"><div class="decision-times">${timestamp(labels.created, decision.createdAt)}${timestamp(labels.updated, decision.outcome.updatedAt)}</div><div class="decision-title"><code class="decision-id">${escape(decision.id)}</code><h3>${text(decision.title)}</h3></div></header>
+${tracking(decisionTracking.get(decision.id))}
 <dl class="decision-facts">${definition(labels.type, decision.type)}${definition(labels.parent, decision.parentId || labels.root)}${definition(labels.trigger, decision.trigger)}${detail(labels.evidence, list(decision.evidence))}</dl>
 <div class="options"><h4>${escape(labels.options)}</h4>${options(decision)}</div>
 <dl class="decision-facts">${detail(labels.recommendation, optionRef(decision, decision.recommendation))}${detail(labels.selection, optionRef(decision, decision.selection))}${decision.selection ? "" : definition(labels.reason, decision.reason)}${definition(labels.riskLevel, decision.risk.level)}${definition(labels.risk, decision.risk.description)}${definition(labels.reversibility, decision.reversibility)}${definition(labels.involvement, decision.userInvolvement)}</dl>
@@ -189,18 +216,18 @@ ${live ? `<p class="live-status" role="status" data-ready="${escape(labels.live)
 ${report.notice ? `<aside class="notice">${escape(report.notice)}</aside>` : ""}
 <main>
 <section id="overview"><h2 class="chapter-heading"><span class="section-number">01</span>${escape(labels.overview)}</h2><div class="task-title"><h1>${escape(ledger.task.summary)}</h1>${badge(report.status)}</div><p class="lead">${escape(report.summary)}</p>
+${tracking(report.trackingItems, true)}
 ${report.analysis ? `<div class="task-analysis"><h4>${escape(labels.analysis)}</h4><p>${escape(report.analysis)}</p></div>` : ""}
 <dl class="overview-context">${definition(labels.repository, report.repository || labels.notRecorded)}${definition(labels.branch, report.branch || report.pr?.head || labels.notRecorded)}${definition(labels.workdir, report.workdir || labels.notRecorded)}</dl>
 <div class="summary-facts"><dl class="summary-duration">${definition(labels.elapsed, duration)}</dl><dl>${definition(labels.started, report.startedAt || labels.notRecorded)}${definition(labels.ended, report.endedAt || labels.notRecorded)}</dl><dl>${definition(labels.prNumber, report.pr?.number ? `#${report.pr.number}` : report.pr ? labels.notRecorded : labels.notCreated)}${definition(labels.pr, report.pr?.url || labels.notCreated)}${report.pr ? definition(labels.prState, report.pr.state) : ""}</dl>${report.pr ? `<dl>${definition(labels.base, report.pr.base)}</dl>` : ""}</div>
-${tracking(report.trackingItems)}
 <div class="context"><h3 class="block-heading">${escape(labels.context)}</h3><dl class="compact-facts">${report.context.map((item) => definition(item.label, item.value)).join("")}</dl></div>
 </section>
 <section id="stages"><h2 class="chapter-heading"><span class="section-number">02</span>${escape(labels.stages)}</h2>
-${report.stages.length ? `<ol class="milestones">${report.stages.map((stage, index) => `<li><h3 class="block-heading"><span class="step">${String(index + 1).padStart(2, "0")}</span>${escape(stage.title)}</h3><p>${escape(stage.summary)}</p>${list(stage.evidence)}${tracking(stage.trackingItems)}</li>`).join("")}</ol>` : `<p class="muted">${escape(labels.none)}</p>`}
+${report.stages.length ? `<ol class="milestones">${report.stages.map((stage, index) => `<li><h3 class="block-heading"><span class="step">${String(index + 1).padStart(2, "0")}</span>${escape(stage.title)}</h3>${tracking(stage.trackingItems)}<p>${escape(stage.summary)}</p>${list(stage.evidence)}</li>`).join("")}</ol>` : `<p class="muted">${escape(labels.none)}</p>`}
 <div class="verification"><h3 class="block-heading">${escape(labels.verification)}</h3>${report.verification.length ? `<div class="checks">${report.verification.map((check) => `<div><span class="muted">${escape(labels.command)}</span><code>${escape(check.command)}</code><span class="muted">${escape(labels.result)}</span><p>${escape(check.result)}</p></div>`).join("")}</div>` : `<p>${escape(labels.none)}</p>`}</div>
 </section>
 <section id="review"><h2 class="chapter-heading"><span class="section-number">03</span>${escape(labels.review)}</h2><div class="review-times">${timestamp(labels.reviewedAt, report.reviewedAt)}</div><p>${escape(report.reviewSummary)}</p>
-${report.reviews.map((review) => `<article class="review-item"><header class="block-heading review-heading"><div class="review-times">${timestamp(labels.reviewedAt, review.reviewedAt)}${timestamp(labels.fixedAt, review.fixedAt)}${timestamp(labels.verifiedAt, review.verifiedAt)}</div><div class="review-title"><span class="severity">${escape(review.severity)}</span><h3>${escape(review.finding)}</h3>${badge(review.status)}</div></header><div class="repair"><div><h4>${escape(labels.fix)}</h4><p>${escape(review.fix)}</p></div><div><h4>${escape(labels.recheck)}</h4><p>${escape(review.verification)}</p></div></div>${list(review.evidence)}${tracking(review.trackingItems)}</article>`).join("")}
+${report.reviews.map((review) => `<article class="review-item"><header class="block-heading review-heading"><div class="review-times">${timestamp(labels.reviewedAt, review.reviewedAt)}${timestamp(labels.fixedAt, review.fixedAt)}${timestamp(labels.verifiedAt, review.verifiedAt)}</div><div class="review-title"><span class="severity">${escape(review.severity)}</span><h3>${escape(review.finding)}</h3>${badge(review.status)}</div></header>${tracking(review.trackingItems)}<div class="repair"><div><h4>${escape(labels.fix)}</h4><p>${escape(review.fix)}</p></div><div><h4>${escape(labels.recheck)}</h4><p>${escape(review.verification)}</p></div></div>${list(review.evidence)}</article>`).join("")}
 </section>
 <section id="decisions"><h2 class="chapter-heading"><span class="section-number">04</span>${escape(labels.decisions)}</h2>
 ${timeline ? `<div class="decision-layout">${outline}<ol class="decision-timeline">${timeline}</ol></div>` : `<p>${escape(labels.emptyTree)}</p>`}

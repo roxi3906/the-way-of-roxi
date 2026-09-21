@@ -154,7 +154,7 @@ npx skills add roxi3906/the-way-of-roxi --list
 - Restores the durable ledger before acting in a resumed or context-restored session
 - Serves a live HTML report through a task-owned mini Node service with start/status/stop commands, automatic JSON refresh, and an offline snapshot; includes repository/worktree/PR metadata, timestamped review findings and fixes, and a complete decision timeline with a clickable outline
 - Keeps report presentation inputs separate from the unchanged version-1 decision ledger; links both the HTML and original private JSON in the delivery response
-- Shows clickable project-management parent links in the report overview and corresponding child links beside stage and review outcomes, including actual statuses and explicit missing-link reasons in live and offline reports
+- Shows the parent task directly below the report summary and related child tasks below stage, review, and key decision headings; both task titles and explicitly labeled platform workflow statuses are clickable in live and offline reports, with honest missing-link reasons
 - Reminds the user that local worktree and branch cleanup can be requested after merge; cleanup is outside this Skill
 
 `roxis-way` defines defaults for:
