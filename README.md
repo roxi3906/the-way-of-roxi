@@ -141,13 +141,24 @@ npx skills add roxi3906/the-way-of-roxi --list
 
 ## Included Skills
 
+Use the short command for an interactive install: follow the prompts to confirm the target agents and choose project or global scope. Expand the alternative for a non-interactive install to all 14 supported agents.
+
 ### `auto-develop`
 
-Install this skill for all 14 supported agents (keep only the agents you use after `--agent`):
+```bash
+npx skills add roxi3906/the-way-of-roxi --skill auto-develop --copy
+```
+
+<details>
+<summary>Install for all 14 supported agents</summary>
+
+Keep only the agents you use after `--agent`:
 
 ```bash
 npx skills add roxi3906/the-way-of-roxi --skill auto-develop --agent codex claude-code cursor gemini-cli github-copilot opencode amp cline goose kiro-cli kimi-code-cli qwen-code roo windsurf --copy -y
 ```
+
+</details>
 
 `auto-develop` performs an explicitly authorized autonomous delivery:
 
@@ -167,11 +178,20 @@ npx skills add roxi3906/the-way-of-roxi --skill auto-develop --agent codex claud
 
 ### `roxis-way`
 
-Install this skill for all 14 supported agents (keep only the agents you use after `--agent`):
+```bash
+npx skills add roxi3906/the-way-of-roxi --skill roxis-way --copy
+```
+
+<details>
+<summary>Install for all 14 supported agents</summary>
+
+Keep only the agents you use after `--agent`:
 
 ```bash
 npx skills add roxi3906/the-way-of-roxi --skill roxis-way --agent codex claude-code cursor gemini-cli github-copilot opencode amp cline goose kiro-cli kimi-code-cli qwen-code roo windsurf --copy -y
 ```
+
+</details>
 
 `roxis-way` defines defaults for:
 
@@ -192,11 +212,20 @@ npx skills add roxi3906/the-way-of-roxi --skill roxis-way --agent codex claude-c
 
 ### `tapd-sync`
 
-Install this skill for all 14 supported agents (keep only the agents you use after `--agent`):
+```bash
+npx skills add roxi3906/the-way-of-roxi --skill tapd-sync --copy
+```
+
+<details>
+<summary>Install for all 14 supported agents</summary>
+
+Keep only the agents you use after `--agent`:
 
 ```bash
 npx skills add roxi3906/the-way-of-roxi --skill tapd-sync --agent codex claude-code cursor gemini-cli github-copilot opencode amp cline goose kiro-cli kimi-code-cli qwen-code roo windsurf --copy -y
 ```
+
+</details>
 
 `tapd-sync` coordinates TAPD tracking across a work session:
 
@@ -220,11 +249,20 @@ npx skills add roxi3906/the-way-of-roxi --skill tapd-sync --agent codex claude-c
 
 ### `tapd-summary`
 
-Install this skill for all 14 supported agents (keep only the agents you use after `--agent`):
+```bash
+npx skills add roxi3906/the-way-of-roxi --skill tapd-summary --copy
+```
+
+<details>
+<summary>Install for all 14 supported agents</summary>
+
+Keep only the agents you use after `--agent`:
 
 ```bash
 npx skills add roxi3906/the-way-of-roxi --skill tapd-summary --agent codex claude-code cursor gemini-cli github-copilot opencode amp cline goose kiro-cli kimi-code-cli qwen-code roo windsurf --copy -y
 ```
+
+</details>
 
 `tapd-summary` produces manual, read-only TAPD summaries:
 
@@ -237,11 +275,20 @@ npx skills add roxi3906/the-way-of-roxi --skill tapd-summary --agent codex claud
 
 ### `visual-companion`
 
-Install this skill for all 14 supported agents (keep only the agents you use after `--agent`):
+```bash
+npx skills add roxi3906/the-way-of-roxi --skill visual-companion --copy
+```
+
+<details>
+<summary>Install for all 14 supported agents</summary>
+
+Keep only the agents you use after `--agent`:
 
 ```bash
 npx skills add roxi3906/the-way-of-roxi --skill visual-companion --agent codex claude-code cursor gemini-cli github-copilot opencode amp cline goose kiro-cli kimi-code-cli qwen-code roo windsurf --copy -y
 ```
+
+</details>
 
 `visual-companion` (Visual Companion) adds optional visual assistance to requirements involving UI or UX changes:
 
