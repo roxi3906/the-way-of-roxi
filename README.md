@@ -141,6 +141,25 @@ npx skills add roxi3906/the-way-of-roxi --list
 
 ## Included Skills
 
+Use the short command for an interactive install: follow the prompts to confirm the target agents and choose project or global scope. Expand the alternative for a non-interactive install to all 14 supported agents.
+
+### `auto-develop`
+
+```bash
+npx skills add roxi3906/the-way-of-roxi --skill auto-develop --copy
+```
+
+<details>
+<summary>Install for all 14 supported agents</summary>
+
+Keep only the agents you use after `--agent`:
+
+```bash
+npx skills add roxi3906/the-way-of-roxi --skill auto-develop --agent codex claude-code cursor gemini-cli github-copilot opencode amp cline goose kiro-cli kimi-code-cli qwen-code roo windsurf --copy -y
+```
+
+</details>
+
 `auto-develop` performs an explicitly authorized autonomous delivery:
 
 - Runs only when selected through the host's Skill UI, invocation syntax, or a direct instruction to use the Skill
@@ -156,6 +175,23 @@ npx skills add roxi3906/the-way-of-roxi --list
 - Keeps report presentation inputs separate from the unchanged version-1 decision ledger; links both the HTML and original private JSON in the delivery response
 - Shows the parent task directly below the report summary and related child tasks below stage, review, and key decision headings; both task titles and explicitly labeled platform workflow statuses are clickable in live and offline reports, with honest missing-link reasons
 - Reminds the user that local worktree and branch cleanup can be requested after merge; cleanup is outside this Skill
+
+### `roxis-way`
+
+```bash
+npx skills add roxi3906/the-way-of-roxi --skill roxis-way --copy
+```
+
+<details>
+<summary>Install for all 14 supported agents</summary>
+
+Keep only the agents you use after `--agent`:
+
+```bash
+npx skills add roxi3906/the-way-of-roxi --skill roxis-way --agent codex claude-code cursor gemini-cli github-copilot opencode amp cline goose kiro-cli kimi-code-cli qwen-code roo windsurf --copy -y
+```
+
+</details>
 
 `roxis-way` defines defaults for:
 
@@ -173,6 +209,23 @@ npx skills add roxi3906/the-way-of-roxi --list
 - Comment language
 - Third-party package installation preference
 - Delivery verification expectations
+
+### `tapd-sync`
+
+```bash
+npx skills add roxi3906/the-way-of-roxi --skill tapd-sync --copy
+```
+
+<details>
+<summary>Install for all 14 supported agents</summary>
+
+Keep only the agents you use after `--agent`:
+
+```bash
+npx skills add roxi3906/the-way-of-roxi --skill tapd-sync --agent codex claude-code cursor gemini-cli github-copilot opencode amp cline goose kiro-cli kimi-code-cli qwen-code roo windsurf --copy -y
+```
+
+</details>
 
 `tapd-sync` coordinates TAPD tracking across a work session:
 
@@ -194,6 +247,23 @@ npx skills add roxi3906/the-way-of-roxi --list
 - Keeps one TAPD write owner across primary, forked, and compacted contexts
 - Keeps the original task moving when TAPD is unavailable
 
+### `tapd-summary`
+
+```bash
+npx skills add roxi3906/the-way-of-roxi --skill tapd-summary --copy
+```
+
+<details>
+<summary>Install for all 14 supported agents</summary>
+
+Keep only the agents you use after `--agent`:
+
+```bash
+npx skills add roxi3906/the-way-of-roxi --skill tapd-summary --agent codex claude-code cursor gemini-cli github-copilot opencode amp cline goose kiro-cli kimi-code-cli qwen-code roo windsurf --copy -y
+```
+
+</details>
+
 `tapd-summary` produces manual, read-only TAPD summaries:
 
 - Runs only when explicitly invoked as `$tapd-summary` or selected by name
@@ -202,6 +272,23 @@ npx skills add roxi3906/the-way-of-roxi --list
 - Combines target-day current-user creation and verified completion events with current-user-owned nonterminal work from any creation date
 - Carries current-user-owned nonterminal work into both the daily summary and live next-day plan while retaining unfinished target-day-created work
 - Returns compact unordered lists grouped by project with title-only work items
+
+### `visual-companion`
+
+```bash
+npx skills add roxi3906/the-way-of-roxi --skill visual-companion --copy
+```
+
+<details>
+<summary>Install for all 14 supported agents</summary>
+
+Keep only the agents you use after `--agent`:
+
+```bash
+npx skills add roxi3906/the-way-of-roxi --skill visual-companion --agent codex claude-code cursor gemini-cli github-copilot opencode amp cline goose kiro-cli kimi-code-cli qwen-code roo windsurf --copy -y
+```
+
+</details>
 
 `visual-companion` (Visual Companion) adds optional visual assistance to requirements involving UI or UX changes:
 
