@@ -3522,6 +3522,28 @@ test("Codex implicit trigger evaluation uses an isolated alias without changing 
   }
 });
 
+test("no-tool outcome probes receive the required reference in their isolated skill context", async () => {
+  const { createEvalSkill } = await loadVerifier();
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "codex-outcome-context-"));
+  try {
+    const sourceSkill = path.join(root, "skills", "auto-develop");
+    const reference = "references/tracking-outcomes.md";
+    const sourceBefore = await readFile(path.join(sourceSkill, "SKILL.md"), "utf8");
+    const evalSkill = await createEvalSkill({
+      sourceSkill,
+      skillsRoot: tempRoot,
+      evalName: "eval-auto-develop-outcomes",
+      inlineReferences: [reference],
+    });
+    const context = await readFile(path.join(evalSkill, "SKILL.md"), "utf8");
+    const requiredContext = await readFile(path.join(sourceSkill, reference), "utf8");
+    assert.ok(context.includes(requiredContext.trim()), "required workflow context is unavailable without tool access");
+    assert.equal(await readFile(path.join(sourceSkill, "SKILL.md"), "utf8"), sourceBefore);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test("Codex trigger output falls back to the final agent message in the JSON event stream", async () => {
   const { resolveCodexOutput } = await loadVerifier();
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), "codex-trigger-output-test-"));
@@ -4212,6 +4234,8 @@ test("Codex trigger verification can select one case without weakening the defau
   assert.deepEqual(
     selectTriggerCases().map(({ id }) => id),
     [
+      "auto-develop-outcomes",
+      "tapd-sync-outcomes",
       "auto-develop-negative",
       "auto-develop",
       "auto-develop-language-zh",

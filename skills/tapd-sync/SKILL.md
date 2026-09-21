@@ -44,6 +44,10 @@ Select an available adapter and read only the workspace, workflow, and item data
 - Do not request a second TAPD business confirmation before automatically creating child requirements or completing bound child requirements. Always honor the host runtime's permission controls for tools, commands, network access, and writes.
 - Run the final-answer gate only for the first substantive reply, an explicit parent binding or creation flow, or a session with a verified binding. Never add automatic synchronization output or a synchronization footer while the session is dormant; explicit read-only query results are allowed.
 
+## Honor Task-Scoped Orchestrator Authorization
+
+An explicitly selected delivery workflow may already authorize parent binding or creation for the current task at its verified confidence gate. Treat that recorded authorization as the required parent business confirmation, including reactivation of a dormant parent flow; after read-back, enter `bound` mode. Preserve all identity, destination, ownership, workflow, permission, and write-verification requirements. Merely mentioning, maintaining, or inheriting the workflow never supplies this authorization. Outside that authorized delivery, retain the ordinary first-reply recommendation and dormant-mode rules.
+
 ## Default Work-Item Discovery to Nonterminal Scope
 
 - Whenever another section authorizes TAPD discovery, apply a nonterminal-only default to its user-driven work-item search, query, list, candidate match, and returned result. This scope rule never initializes TAPD, reactivates dormant synchronization, or changes existing pagination, ranking, and presentation limits. Resolve terminal states from the current workspace's workflow and work-item type metadata rather than hardcoded status names.
@@ -76,7 +80,7 @@ Maintain the following state in the current session context:
 - `tapd_binding`: The bound parent's workspace, project name, type, ID, and title.
 - `tapd_first_reply_sent`: Whether the first substantive request has received its final answer.
 - `tapd_sync_mode`: `active` before the first reply or during an explicit parent flow, `dormant` after an unbound first exchange without parent intent or after an explicit decline, and `bound` after a parent binding verifies successfully.
-- `tapd_session_children`: Child requirements created or reused in this session and the user requests or independently acceptable phase outcomes they represent.
+- `tapd_session_children`: Child requirements created, reused, or restored for this delivery, with stable delivery/outcome identity, scope, acceptance criteria, item ID, owner, type, parent, actual status, evidence, and pending synchronization. Persist these bindings in the orchestrator's existing private evidence store when available so resumption does not duplicate items.
 - `tapd_phase_events`: Phase events attempted for the bound delivery, keyed by a stable event ID persisted before the first write, with delivery, parent, stage, state, summary, event time, evidence, next stage, write result, and read-back result.
 - `tapd_reply_items`: The parent, candidates, phase updates, and children relevant to the current final answer, including each user-readable title, URL, status, and action taken. Reset it for every substantive user request.
 - `tapd_partial_writes`: Work items that were created but failed post-write verification, recording workspace, parent ID or top-level absence, normalized title, item ID, and failure reason.
@@ -239,7 +243,7 @@ Requests that usually do not have tracking value include:
 
 Create only when independent tracking value is clear, avoiding low-value TAPD noise. Create separate children for multiple independently acceptable goals in one request. Create only one child for internal steps of the same deliverable.
 
-Apply the same test to an orchestrating workflow's delivery stage. A stage name alone has no independent tracking value. Create or reuse a child only for a distinct stage outcome that can be reviewed, accepted, or delivered independently; routine research, planning, implementation, verification, review, and closeout activity remains progress on the bound parent. Name a child for its outcome rather than for a generic stage.
+Apply the same test before each stage of a bound delivery and whenever new scope is discovered. Every result with a distinct reviewable output and acceptance criterion requires a child; it need not ship separately. Planned root-cause reports, design decisions, compatibility matrices, review findings and remediation can qualify before their artifacts exist. Bind or create as soon as their scope and acceptance criteria are known, before substantive work. A generic stage name, routine command, repeated test run, or internal step of an already tracked outcome does not create another child. Name the outcome, not the stage; keep one binding for the same outcome across stages.
 
 ## Record Bound Delivery Phases
 
@@ -254,46 +258,60 @@ Represent the event with the first supported option whose meaning is verified:
 
 Use a workflow transition only when current TAPD metadata identifies one unique legal nonterminal mapping for that stage. Never create a field, overwrite the parent's description, guess a status, or move the parent to a terminal state for a phase event. After each write, fetch the parent activity or field history and require the exact event ID and exact event payload to be present before adding a successful `tapd_phase_events` record. The current value of a replaceable field alone is never historical read-back evidence.
 
-For an independently valuable phase outcome, create or reuse one direct child through the existing child-requirement flow and verify its owner and parent. Code-bearing children remain open until a successful Git commit covers their outcome. A non-code child may complete only when its durable artifact or explicit acceptance evidence is available and the workspace exposes one unambiguous legal successful transition. A stage label or an in-memory conclusion alone is not completion evidence.
+For every independently valuable phase outcome, create or reuse one direct child through the child-requirement flow, verify its owner and parent, and apply the child lifecycle below. Code-bearing children remain nonterminal until acceptance is satisfied and a successful Git commit covers their outcome. A non-code child may complete when its durable artifact or explicit acceptance evidence satisfies its acceptance criteria and the workspace exposes one unambiguous legal successful transition. A stage label or an in-memory conclusion alone is not completion evidence.
 
 Apply the adapter's limited retry rules to transient failures. Preserve an unverified or failed event with its non-sensitive reason, continue the original delivery unless phase synchronization is its explicit acceptance criterion, and never claim the phase was synchronized without read-back.
 
 ## Create or Reuse Child Requirements Automatically
 
-For a valuable user request, perform these steps before starting the requested work. For an independently acceptable phase outcome discovered during delivery, perform them as soon as that outcome and its evidence are known. Do not ask for another TAPD business confirmation, and continue to honor host runtime permission prompts for tools, network access, and writes:
+For a valuable user request, perform these steps before starting the requested work. For a planned or newly discovered phase outcome, perform them once its scope and acceptance criteria are known, before substantive work; do not wait for completion evidence. Do not ask for another TAPD business confirmation, and continue to honor host runtime permission prompts for tools, network access, and writes:
 
 1. Confirm that `tapd_sync_mode` is `bound`, the current context is `tapd_write_owner`, and the session still has a complete, verified binding. Otherwise skip the TAPD write and continue the user's requested work.
 2. Confirm that `tapd_project_name.status` is `resolved` and its value matches `tapd_binding.project_name`. If not, skip the TAPD write, report the project-name conflict, and continue the user's requested work.
 3. Generate a concise, specific, and verifiable `【{tapd_project_name.value}】{work_description}` title that names the user outcome or independently acceptable phase outcome, never just the stage.
-4. Check `tapd_partial_writes` for the child logical idempotency key before querying reusable items or issuing a create. If a recorded child now passes verification, reuse it and continue at step 12 without creating another item.
-5. Query every page of the bound parent's open child requirements and compare normalized titles. Reuse only an open title match whose parent relationship and semicolon-normalized owner both verify against `tapd_binding` and `tapd_owner.value`. If matching items exist but none pass verification, do not reuse them, do not create a duplicate, report the conflict, and continue the user's original task.
+4. First restore a persisted binding for the same delivery/outcome by exact ID and verify its scope, owner, type, parent, actual status, and evidence. A verified successfully completed item for an unchanged outcome is already satisfied: retain its binding without creating, reopening, or repeating completion. This is restoration, not reuse of closed work for a new request. A verified nonterminal binding goes directly to step 12 and its lifecycle; do not search or create again even if its title changed. If the binding conflicts, stop this outcome's writes and report the conflict. Otherwise check `tapd_partial_writes` for the child logical idempotency key before querying reusable items or issuing a create. If a recorded child now passes verification, reuse it and continue at step 12 without creating another item.
+5. Query every page of the bound parent's open child requirements and compare normalized titles. Reuse only one unambiguous open title match whose scope, acceptance criteria, type, parent relationship and semicolon-normalized owner verify against this outcome, `tapd_binding` and `tapd_owner.value`. Title equality alone is insufficient. If multiple valid matches exist or matching items exist but none pass verification, do not choose one or create a duplicate, report the conflict, and continue the user's original task.
 6. Before issuing a new create, perform the internal all-status idempotency safety read allowed by the discovery-scope rules: query every page and status for the logical key and record all matching item IDs. Do not reuse a closed match for a new request or expose it as a discovery result.
 7. Prefer the selected TAPD skill or CLI's generic create-child-requirement operation. Require it to create a requirement in TAPD's unified work-item model, use the item in `tapd_binding` as the parent regardless of its displayed type, and verify the returned parent relationship. Never substitute a legacy task creation operation.
 8. When falling back to HTTP, follow the current official TAPD API and unified work-item model, create the child through `/stories`, and set `parent_id`. Never claim success if the API does not support the current parent relationship.
 9. Dynamically resolve the preferred automatic-child `workitem_type_id` using the purpose-based type rules.
 10. Require a resolved `tapd_owner`. If it is unresolved, skip creation, report the non-sensitive reason, and continue the user's original task. Otherwise set the owner to `tapd_owner.value`, the start date to the runtime's current date, and the due date to one calendar day later.
 11. For a newly created child, verify both its returned parent relationship and its returned or fetched owner before treating synchronization as successful.
-12. Add the created or reused item and its corresponding user request to `tapd_session_children`, then continue the user's requested work.
+12. Add the created or reused item and its corresponding user request or stage outcome to `tapd_session_children`, persist its stable binding and acceptance criteria, then follow its lifecycle while continuing the user's requested work.
 
 Attach every automatic child directly to the session's bound parent. Never turn the previous turn's child into the next turn's parent.
 
+## Follow Bound Children Throughout Execution
+
+Apply this lifecycle to every bound child, including before the final-answer gate. Reconcile the outcome list at stage boundaries, after context restoration, and before delivery; create missing valuable children and recover pending writes through the same verified flow. Do not defer all synchronization until the final answer.
+
+- At work start, record scope, acceptance criteria and next action, then move the child to the uniquely mapped active state.
+- At meaningful progress, update its evidence, acceptance progress and next action on the same child.
+- When blocked, record the concrete blocker and resumption condition and use the uniquely mapped blocked state when supported. When work resumes, record resolution and move back to the mapped active state.
+- On non-code acceptance, attach the durable artifact or explicit acceptance evidence and use the unique legal successful completion transition. No code commit is required for a purely non-code outcome.
+- For code-bearing or mixed outcomes, use the commit-completion gate below. A commit is not required to record progress or to enter active or blocked states.
+
+Before each transition, fetch the item and current workflow metadata for its `workitem_type_id`. If the verified current state already matches the intended state, omit the transition and record only new progress. Use only an unambiguous legal transition or supported path, verifying every intermediate step without bypassing approvals. If no unique mapping exists, preserve status and record progress or the blocker through supported activity/fields with the missing mapping noted. A skipped or withdrawn outcome is not successful completion. Never complete the parent as a side effect of child synchronization.
+
+Persist stable activity event IDs before writing. After every mutation, fetch and verify the exact activity payload and actual status, owner, and parent as applicable. Recover an ambiguous result from current item/history before retrying, within adapter limits; keep failed read-backs pending and never report them as synchronized. Report verified item links and actual states, plus unsynchronized actions and reasons.
+
 ## Complete Corresponding Children After Code Commits
 
-A lifecycle hook is not required. Whenever the write owner directly observes a successful code commit during the work:
+A lifecycle hook is not required. Whenever the write owner directly observes a successful code commit during the work, and at later reconciliation when acceptance becomes satisfied, evaluate the covering commit. Restore and verify earlier commit evidence and its diff when resuming; do not require a new commit merely because validation completed later:
 
 1. Inspect the commit diff and the delivery goal represented by each child in `tapd_session_children`.
-2. Identify every child actually covered by the commit, including children created in earlier turns but completed by this commit.
+2. Identify every code-bearing child actually covered by the commit whose acceptance criteria are satisfied, including children created in earlier turns but completed by this commit.
 3. Query the currently allowed workflow transitions in each workspace.
 4. Select a legal terminal state that the workspace's workflow metadata identifies as successful completion. Prefer states explicitly named `Done`, `已完成`, or `完成`, and complete every child actually covered by the commit.
-5. Never complete children that the commit does not cover. Never complete the bound parent automatically.
+5. Fetch each affected child and verify its actual status, owner and parent after every transition. Record ambiguous or failed results for recovery without claiming completion. Never complete code-bearing children that the commit does not cover. Never complete the bound parent automatically.
 
-Keep child requirements in their current state when no code commit occurs. If workflow metadata does not identify a successful completion state, multiple completion states remain ambiguous, or no legal transition exists from the current state, never guess another closed state. Record the reason and continue delivering the code result.
+Without a covering code commit, keep code-bearing children nonterminal; continue their progress, active, blocked, and resumed updates. Non-code children use the durable-evidence completion rule above. If workflow metadata does not identify a successful completion state, multiple completion states remain ambiguous, or no legal transition exists from the current state, never guess another closed state. Record the reason and continue delivering the code result.
 
 ## Keep Writes Traceable and Idempotent
 
 - Retry transient read failures a limited number of times.
 - Treat workspace, parent ID or top-level absence, and normalized title as the logical idempotency search key, not by itself as proof that an item came from the current create attempt.
-- When a create request times out or returns an ambiguous result, prefer an adapter-provided idempotency key or returned ID. Otherwise use the internal all-status idempotency safety read allowed by the discovery-scope rules: query every page and status for the logical key and compare matching IDs with the pre-create snapshot. Treat only a newly appeared matching ID as the result of this attempt; a pre-existing closed item is not reusable, must not appear in discovery results, and is not evidence of success. Retry only after confirming that no new item was created.
+- When a create request times out or returns an ambiguous result, prefer an adapter-provided idempotency key or returned ID. Otherwise use the internal all-status idempotency safety read allowed by the discovery-scope rules: query every page and status for the logical key and compare matching IDs with the pre-create snapshot. Treat only a newly appeared matching ID as the result of this attempt; a pre-existing closed item is not reusable for a new outcome, must not appear in discovery results, and is not evidence that the attempted create succeeded. Exact-ID restoration of a persisted completed binding for the same delivery and unchanged outcome remains allowed. Retry only after confirming that no new item was created.
 - Continue processing other workspaces when one workspace fails, and record failures separately.
 - Never claim successful synchronization after a failed TAPD create or transition.
 - Never retry a create merely because owner verification failed; preserve the `tapd_partial_writes` record because the returned work-item ID proves that the write may already exist.
@@ -306,7 +324,7 @@ Immediately before a final answer for a substantive work request, rerun the inte
 1. When `tapd_sync_mode` is `dormant` and the current request has no explicit parent reactivation intent, stop this skill immediately. Do not access an adapter, evaluate work items or children, inspect commits for TAPD completion, or append a TAPD footer.
 2. When a dormant request explicitly reactivates parent binding or creation, set `tapd_sync_mode` to `active` and process only that explicit TAPD flow before continuing.
 3. On the first substantive final answer, ensure read-only initialization and matching have run, then recommend the best perfect matches or propose creation according to the first-answer rules.
-4. When `tapd_sync_mode` is `bound`, reset `tapd_reply_items`, re-evaluate whether the current request and any newly reported phase outcome have independent tracking value, and create or reuse each missing valuable child before sending the final answer.
+4. When `tapd_sync_mode` is `bound`, reset `tapd_reply_items`, reconcile every planned or discovered valuable outcome with its persisted child binding and actual status, and recover missing items or pending progress/transition updates before sending the final answer. Restore verified completed same-delivery bindings without duplicate writes. Record any remaining unsynchronized action and reason.
 5. In `bound` mode, process every phase event supplied since the previous applicable gate in event order, recover ambiguous writes before retrying, and read back every successful mutation.
 6. Only in `bound` mode, inspect successful Git commits observed since the previous applicable gate and complete every code-bearing bound child actually covered by those commits. Apply the durable-evidence rule to non-code phase children.
 7. Refresh only the parent, candidates, phase updates, or children relevant to the applicable first-reply, explicit-parent, or bound flow. Resolve current user-facing URLs through the selected adapter or its documented TAPD URL format. Never invent a URL or expose an ID as fallback text.
