@@ -43,3 +43,22 @@ test("behavior probes cover natural requests and multi-turn continuation", () =>
   assert.ok(continuation.turns.every(turn => turn.toolPolicy === "none"));
   assert.equal(selectTriggerCases("roxis-way-negative")[0].mode, "negative");
 });
+
+test("delivery probe rejects wrong target languages and invalid commit approvals", () => {
+  const decision = {
+    bodyLanguages: ["en", "zh-CN", "en", null, "zh-CN"],
+    needsRepositoryEvidence: [false, false, false, true, false],
+    validCommitIndexes: [0, 1, 2, 3],
+  };
+  assert.doesNotThrow(() => assertTriggerBehavior("roxis-way-delivery", marked(decision), "eval-roxis-way"));
+  for (const patch of [
+    { bodyLanguages: ["zh-CN", "en", "zh-CN", "en", "en"] },
+    { needsRepositoryEvidence: [false, false, false, false, false] },
+    { validCommitIndexes: [0, 1, 2, 3, 4] },
+    { validCommitIndexes: [0, 1] },
+    { published: true },
+  ]) {
+    assert.throws(() => assertTriggerBehavior("roxis-way-delivery", marked({ ...decision, ...patch }), "eval-roxis-way"));
+  }
+  assert.throws(() => assertTriggerBehavior("roxis-way-delivery", marked(decision).replace('{', '{"validCommitIndexes":[], '), "eval-roxis-way"));
+});

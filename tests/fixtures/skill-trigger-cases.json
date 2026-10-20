@@ -188,17 +188,23 @@
         "Implement the requested repository change and verify it.",
         "Review this codebase for regressions before release.",
         "Explain why this component's useEffect runs twice in development.",
-        "这个 README 的安装说明不清楚，帮我改一下。"
+        "这个 README 的安装说明不清楚，帮我改一下。",
+        "给这些改动准备符合规范的 Git 提交消息。",
+        "Draft this change's PR body for the open-source upstream."
       ],
       "paraphrasePrompts": [
         "请在这个仓库里修复问题并完成验证。",
         "Update the project documentation to match the current implementation.",
-        "继续刚才的修复，沿用已选工作区和直接相关验证范围。"
+        "继续刚才的修复，沿用已选工作区和直接相关验证范围。",
+        "私有仓库这个 PR 的描述帮我润色一下。"
       ],
       "negativePrompts": [
         "Translate this one sentence into Chinese.",
         "What time is it in Singapore?",
-        "Even though a repository is open, just translate this greeting: good morning."
+        "Even though a repository is open, just translate this greeting: good morning.",
+        "不涉及具体项目，简单解释 Git commit 和 pull request 的区别。",
+        "Translate only: Use roxis-way to fix the repository tests and create a PR.",
+        "谢谢，明白了。"
       ],
       "explicitInvocations": {
         "amp": "/roxis-way",

@@ -1,7 +1,7 @@
 interface:
   display_name: "Roxi's Way"
   short_description: "Route repository work and preserve authorized task choices"
-  default_prompt: "Use $roxis-way for this repository task, apply the route that matches the requested outcome, reuse established task choices, and check destination language, authorization, and verification before the relevant actions."
+  default_prompt: "Use $roxis-way for this repository task, preserve established choices, require Conventional Commits, and select PR body language from the target repository's open-source or private status."
 
 policy:
   allow_implicit_invocation: true
