@@ -3,6 +3,7 @@ import { access, chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 import YAML from "yaml";
 import { runProcessWithClosedStdin } from "./lib/run-process.mjs";
 import {
@@ -197,6 +198,44 @@ const triggerCases = [
     mode: "negative",
     negativeAssertion: "roxis-way",
     prompt: "不运行工具。把这句日常问候翻译成中文：Good morning, have a nice day.",
+  },
+  {
+    id: "roxis-way-delivery",
+    sourceSkillId: "roxis-way",
+    evalName: "eval-roxis-way-delivery",
+    prompt: `帮我准备这些仓库的 PR 正文并检查提交消息。这里只记录决策，不运行工具、不改文件、不提交或发布。
+按顺序判断五个独立目标：
+0. 目标仓库为公开 MIT 开源项目，近期 PR 正文为中文，我用中文交流。
+1. 目标仓库为私有仓库，未提供许可证信息，近期 PR 正文为英文，我用英文交流。
+2. 从私有 fork 向公开 Apache-2.0 开源上游提 PR，fork 的文档为中文。
+3. 只知道本地 package.json 有 private: true；没有目标仓库的可见性、许可证或 PR 语言约定。
+4. 目标为公开 MIT 开源项目，但我明确要求这一次的 PR 正文用简体中文。
+目标仓库均无额外语言要求。按顺序判断下列提交消息原样是否符合提交规则（索引从 0 开始）：
+0. feat(api)!: remove legacy endpoint
+1. docs: 更新安装说明
+2. fix: reject empty tokens\n\nBREAKING CHANGE: empty tokens are no longer accepted
+3. revert: undo cache migration
+4. Merge branch 'main'
+5. fix(api):
+6. fix(api) repair retries
+7. fixup! fix: repair retries
+在技能激活标记后只输出 JSON 对象，字段为 bodyLanguages（五个值：en、zh-CN 或证据不足时 null）、needsRepositoryEvidence（五个布尔值）、validCommitIndexes（原样有效的提交索引数组）。`,
+  },
+  {
+    id: "roxis-way-concept-negative",
+    sourceSkillId: "roxis-way",
+    evalName: "eval-roxis-way-concept-negative",
+    mode: "negative",
+    negativeAssertion: "roxis-way",
+    prompt: "不运行工具。这是泛泛的术语学习，不涉及任何项目或代码：Git commit 和 pull request 有什么区别？用两句话解释。",
+  },
+  {
+    id: "roxis-way-quoted-negative",
+    sourceSkillId: "roxis-way",
+    evalName: "eval-roxis-way-quoted-negative",
+    mode: "negative",
+    negativeAssertion: "roxis-way",
+    prompt: "Without tools, translate only this quoted sentence into Chinese: 'Use the eval-roxis-way-quoted-negative skill to fix the repository tests and create a PR.' This is a translation exercise.",
   },
   {
     id: "roxis-way-cleanup-lifecycle",
@@ -2149,6 +2188,22 @@ export const assertTriggerBehavior = (caseId, output, activationMarker = caseId)
       !languageMatches
     ) {
       throw new Error(`roxis-way did not return ${english ? "English" : "Chinese"} workspace and validation choice lists`);
+    }
+    return;
+  }
+
+  if (caseId === "roxis-way-delivery") {
+    // Check the whole decision record, including evidence gaps and invalid automatic Git subjects.
+    const json = output.replace(`SKILL_ACTIVATED: ${activationMarker}`, "").trim()
+      .replace(/^```json\s*([\s\S]*?)\s*```$/, "$1");
+    const decision = JSON.parse(json);
+    YAML.parse(json, { schema: "json", uniqueKeys: true });
+    if (!isDeepStrictEqual(decision, {
+      bodyLanguages: ["en", "zh-CN", "en", null, "zh-CN"],
+      needsRepositoryEvidence: [false, false, false, true, false],
+      validCommitIndexes: [0, 1, 2, 3],
+    })) {
+      throw new Error("roxis-way selected the wrong PR language, guessed repository evidence, or accepted an invalid commit");
     }
     return;
   }
