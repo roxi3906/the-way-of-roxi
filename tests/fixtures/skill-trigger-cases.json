@@ -245,6 +245,8 @@
         "Implement this repository feature and keep the work tracked.",
         "Fix the defect linked to this TAPD work item.",
         "排查这个接口为什么超时。",
+        "先分析这个故障是否成立，再评估修复方案是否可行。",
+        "按刚才确认的方案开始实施 tpad",
         "查询 TAPD 中与 README 安装说明有关的所有未完成工作项。"
       ],
       "paraphrasePrompts": [

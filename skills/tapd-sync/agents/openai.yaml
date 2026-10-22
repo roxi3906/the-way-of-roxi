@@ -1,6 +1,6 @@
 interface:
   display_name: "TAPD Sync"
-  short_description: "Bind once, then track delivery phases"
-  default_prompt: "Use $tapd-sync to route by work intent and existing session state, match the first substantive work result, recommend a parent once, keep unbound continuations dormant, answer explicit queries read-only, and track independently valuable outcomes after binding."
+  short_description: "Track analysis, tpad authorization, execution and cleanup"
+  default_prompt: "Use $tapd-sync to check analysis and execution entry, honor a boundary tpad as task-scoped authorization to bind a unique match scoring at least 90 or create a parent, preserve refusals, follow bound outcomes, and include their terminal transitions in the reviewed cleanup plan."
 policy:
   allow_implicit_invocation: true

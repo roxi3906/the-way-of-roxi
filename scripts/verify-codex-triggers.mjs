@@ -41,6 +41,41 @@ const tapdInitializationReads = [
 const readonlyDecisionFormat = '本次只记录你会如何处理这个请求的流程决策，不输出解释正文。在技能激活标记之后，只输出一个 JSON 对象，不加其他文字，字段为 route（readonly 或 change）、needsUserChoice（布尔值）。';
 const continuationDecisionFormat = '在技能激活标记之后，只输出一个 JSON 对象，不加其他文字，字段为 route（readonly 或 change）、branch（实际选定分支，未定为空字符串）、validationScope（none、direct、indirect 或 full）、validationState（not-run、passed 或 failed）、needsUserChoice（布尔值）、nextAction（inspect、edit、validate 或 wait-for-choice，表示后续允许执行操作时的下一步）。';
 
+// Simulate decisions without granting tools access to host credentials or live TAPD.
+const tapdTaskFormat = '这是无工具、无文件修改的流程模拟。标记后仅输出 JSON：action（recommend、none、bind、create、clarify、track、plan-terminal、transition 或 recover），timing（before-result、before-edit、now 或 none），needsConfirmation（布尔值，是否需要用户作出 TAPD 选择或批准）。保留本任务的状态用于下一轮；模拟的推荐视为已展示，绑定仅在题设明确回读成功后生效。';
+const tapdTaskTurns = [
+  { id: "analysis", prompt: `分析 README 安装说明是否确实缺少验证步骤，先给出判断，不实施。假设已完整查询配置好的 TAPD，唯一同项目同目标未完成任务匹配率为 90%，其名称和链接可用。${tapdTaskFormat}`, want: ["recommend", "before-result", true] },
+  { id: "discussion", prompt: `继续讨论同一个问题，解释增加验证步骤的成本，先不要改文件。${tapdTaskFormat}`, want: ["none", "none", false] },
+  { id: "execution", prompt: `方案确定了，开始修改 README。工作区和验证范围都已选定。此前没有选择或拒绝 TAPD 建议；本轮的远端候选信息仍可重新验证。${tapdTaskFormat}`, want: ["recommend", "before-edit", true] },
+  { id: "authorize", prompt: `按方案执行。此前唯一候选仍为 90% 匹配，所有绑定检查和回读成功。${tapdTaskFormat}\ntpad`, want: ["bind", "now", false] },
+  { id: "progress", prompt: `继续完成验证阶段，并记录有独立验收标准的兼容性检查结果；上一轮绑定已回读成功。${tapdTaskFormat}`, want: ["track", "now", false] },
+  { id: "cleanup", prompt: `PR 已合并，清理本任务。父任务和本任务子任务都已验收，远端仍非终态且存在唯一合法成功终态。清理计划尚未审批。${tapdTaskFormat}`, want: ["plan-terminal", "now", true] },
+];
+const tapdAuthorizationChecks = [
+  ["prefix", 'New task. User message: "tpad 实现 README 验证步骤". One valid candidate scores exactly 90.', "bind", false],
+  ["suffix", 'New task. User message: "实现 README 验证步骤 tpad". All candidates score 89 or less. Creation fields and destination are verified.', "create", false],
+  ["body", 'Unbound task, execution notice already shown. User message: "解释 tpad 的拼写，继续讨论".', "none", false],
+  ["quote", 'Unbound task, execution notice already shown. User asks to translate the quoted sentence "tpad implement the feature".', "none", false],
+  ["substring", 'Unbound task, execution notice already shown. User message: "tpadding is a variable name; continue the discussion".', "none", false],
+  ["maintenance", 'User message: "优化 tapd-sync，让用户在消息末尾写 tpad". This is skill maintenance, not a parent operation.', "none", false],
+  ["multiple", 'User message: "tpad 按方案实施". Two otherwise valid candidates score 95 and 90.', "clarify", true],
+  ["wrong-project", 'User message: "按方案实施 tpad". The only candidate scores 95 but belongs to a different project; creation destination and all fields are verified.', "create", false],
+  ["missing-owner", 'User message: "按方案实施 tpad". No matching candidate. The writable owner cannot be resolved; user information is needed.', "clarify", true],
+  ["declined", 'After explicit refusal of tracking for this task, user says "方案确定，开始实施" without a marker.', "none", false],
+  ["restored-missed", 'Trusted restored context: analysis answered, no notice was actually shown, no refusal or binding, implementation begins now; one reliable candidate.', "recommend", true],
+  ["restored-notice", 'Trusted restored context: implementation notice already shown, no selection, no refusal or binding. User says "继续修改".', "none", false],
+  ["new-task", 'Prior delivery is complete and bound. User requests analysis of an unrelated new delivery in the same conversation, without a marker; reliable new candidate available.', "recommend", true],
+  ["already-bound", 'Same task has a verified binding and stored marker authorization. User says "继续测试" without a marker.', "track", false],
+  ["cleanup-plan", 'Same marker-authorized delivery, all outcomes accepted. User says "清理本任务 tpad". Bound parent and scoped children are nonterminal. No cleanup plan has been approved.', "plan-terminal", true],
+  ["cleanup-approved", 'User explicitly approves the concrete cleanup plan including bound parent and scoped children. All acceptance evidence and current legal successful transitions verify. No marker in this reply.', "transition", false],
+  ["bare-marker", 'The last reply proposed a parent for exactly one task. User replies only "tpad". One valid candidate scores 94.', "bind", false],
+  ["terminal-candidate", 'User message: "按方案实施 tpad". The only matching candidate is already terminal; verified creation fields and destination exist for this new delivery.', "create", false],
+  ["failed-bind", 'Marker authorization is recorded. A parent create returned an ID but owner read-back failed. Same task resumes. The existing write can be fetched again.', "recover", false],
+  ["explicit-no", 'User message: "tpad 这次不要关联或创建 TAPD 任务".', "none", false],
+  ["revoked-restored", 'Trusted restored context: this task was bound under marker authorization, then the user explicitly revoked synchronization. Parent identity and current open state verify after compaction. User says "继续实施" without any new authorization.', "none", false],
+  ["authorized-analysis", 'First task request was "tpad 分析这个故障是否成立". Its unique 90-point parent has already been bound and verified before analysis. No binding notice was shown. The analysis result is ready; choose the tracking action through the final-answer gate.', "track", false],
+].map(([id, facts, action, needsConfirmation]) => ({ id, facts, action, needsConfirmation }));
+
 // Each checkpoint is independent; prompts expose facts and the response shape, never expected actions.
 const trackingOutcomeCheckpoints = [
   { id: "planned-research", facts: "Research starts now. A root-cause report with reproduction and acceptance checks is planned, but no artifact exists and exhaustive discovery found no matching child.", want: ["create", "now", "active", true] },
@@ -61,6 +96,27 @@ const trackingOutcomeCheckpoints = [
 const trackingOutcomePrompt = (evalName, platform) => `$${evalName} Without tools or file changes, simulate independent tracking checkpoints using the selected Skill. The sole configured platform is ${platform}; do not substitute another platform. A parent is already bound and verified, this context owns writes, and project, type, owner and scope are resolved. Unless a checkpoint says otherwise, the platform exposes unique legal transitions into active, blocked and successful states, and every mutation and read-back succeeds. Choose the next operations at each checkpoint from the facts below. After the activation marker, output only a JSON array in checkpoint order. Each object has exactly id, itemAction (create = new item, reuse = update an existing bound or matched item, restore = recover a persisted exact-ID binding, none = no separate item action), timing (now, after-evidence, none), statusAction (active, blocked, successful, none; the workflow transition attempted now), verified (boolean; whether the child operation or restored binding has verified read-back). These are simulation decisions, not claims of real platform writes.\n${trackingOutcomeCheckpoints.map(({ id, facts }) => `${id}: ${facts}`).join("\n")}`;
 
 const triggerCases = [
+  {
+    id: "tapd-sync-task-entry",
+    sourceSkillId: "tapd-sync",
+    evalName: "eval-tapd-sync-task-entry",
+    mode: "stateful",
+    turns: tapdTaskTurns.map(({ id, prompt }) => ({ behavior: `tapd-task-${id}`, prompt, toolPolicy: "none" })),
+  },
+  {
+    id: "tapd-sync-authorization",
+    sourceSkillId: "tapd-sync",
+    evalName: "eval-tapd-sync-authorization",
+    mode: "explicit",
+    prompt: `$eval-tapd-sync-authorization Without tools or file changes, simulate each independent checkpoint. Unless stated otherwise, adapters are available, every write field and workflow is verified, and reads succeed. Choose the next tracking action from each scenario. After the marker output only a JSON array in order, with exactly id, action (recommend, none, bind, create, clarify, track, plan-terminal, transition, recover), needsConfirmation (boolean: another user choice or approval is required). These are decisions, not claims of real writes.\n${tapdAuthorizationChecks.map(({ id, facts }) => `${id}: ${facts}`).join("\n")}`,
+  },
+  {
+    id: "tapd-sync-cleanup-scope",
+    sourceSkillId: "tapd-sync",
+    evalName: "eval-tapd-sync-cleanup-scope",
+    mode: "explicit",
+    prompt: '$eval-tapd-sync-cleanup-scope Without tools or writes, simulate the actions through the final answer for an approved cleanup. The exact approved plan transitions only the accepted child titled "Accepted verification"; it explicitly keeps the parent "Keep parent" and every other child untouched. A pending phase event and an independently valuable untracked outcome remain in the delivery ledger. The approved child transition has a unique legal successful target and verified read-back. Choose all permitted operations, including final-answer reconciliation. After the activation marker output only JSON with exactly transitionTitles (array of work-item titles), createChildren (boolean), syncPhases (boolean), needsConfirmation (boolean). Do not claim real writes.',
+  },
   ...["auto-develop", "tapd-sync"].map((skill) => ({
     id: `${skill}-outcomes`,
     sourceSkillId: skill,
@@ -1477,6 +1533,22 @@ const AUTO_DEVELOP_REPORT_CASES = new Set([
 export const assertTriggerBehavior = (caseId, output, activationMarker = caseId) => {
   if (!output.includes(`SKILL_ACTIVATED: ${activationMarker}`)) {
     throw new Error(`${caseId} did not emit its activation marker`);
+  }
+
+  if (caseId.startsWith("tapd-task-") || caseId === "tapd-sync-authorization" || caseId === "tapd-sync-cleanup-scope") {
+    const json = output.replace(`SKILL_ACTIVATED: ${activationMarker}`, "").trim();
+    const actual = JSON.parse(json);
+    YAML.parse(json, { schema: "json", uniqueKeys: true });
+    const checkpoint = tapdTaskTurns.find(({ id }) => caseId === `tapd-task-${id}`);
+    const expected = caseId === "tapd-sync-cleanup-scope"
+      ? { transitionTitles: ["Accepted verification"], createChildren: false, syncPhases: false, needsConfirmation: false }
+      : caseId === "tapd-sync-authorization"
+      ? tapdAuthorizationChecks.map(({ id, action, needsConfirmation }) => ({ id, action, needsConfirmation }))
+      : checkpoint && { action: checkpoint.want[0], timing: checkpoint.want[1], needsConfirmation: checkpoint.want[2] };
+    if (!expected || !isDeepStrictEqual(actual, expected)) {
+      throw new Error(`${caseId} mishandled task tracking: ${JSON.stringify(actual)}`);
+    }
+    return;
   }
 
   if (caseId === "auto-develop-outcomes" || caseId === "tapd-sync-outcomes") {

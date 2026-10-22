@@ -4234,6 +4234,9 @@ test("Codex trigger verification can select one case without weakening the defau
   assert.deepEqual(
     selectTriggerCases().map(({ id }) => id),
     [
+      "tapd-sync-task-entry",
+      "tapd-sync-authorization",
+      "tapd-sync-cleanup-scope",
       "auto-develop-outcomes",
       "tapd-sync-outcomes",
       "auto-develop-negative",
