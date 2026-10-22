@@ -231,15 +231,16 @@ npx skills add roxi3906/the-way-of-roxi --skill tapd-sync --agent codex claude-c
 
 `tapd-sync` coordinates TAPD tracking across a work session:
 
-- Recognizes work intent across languages without requiring TAPD keywords; continuations such as `继续` inherit the current task and sync mode
+- Recognizes concrete analysis and feasibility questions (including `是否成立` and `是否可行`) across languages without TAPD keywords; continuations such as `继续` preserve the same delivery's state
 - Excludes skill maintenance, quoted commands, translations, and requests delegated to `tapd-summary`; mentioning a work-item keyword alone does not start synchronization
 - Answers explicit TAPD queries read-only without binding, consuming the first-work-request opportunity, or waking dormant synchronization
-- Runs one read-only TAPD match before the first substantive work result and lightly recommends a parent binding there; clarification and workspace/test-scope questions do not consume that opportunity
-- Suspends all later automatic TAPD checks, prompts, child handling, and footers when the first exchange ends unbound without explicit parent intent
-- Reactivates only when the user later selects the first recommendation or explicitly requests parent binding or creation
+- Matches before a concrete analysis result and checks again before the first implementation action when unbound and not explicitly declined; `roxis-way` also calls this checkpoint so missed analysis activation does not silently skip execution entry
+- Records actual analysis/execution notices separately from substantive replies; ignored notices are not refusals, repeated discussion/edits do not repeat reminders, and restored same-task context preserves notices and authorization
+- Accepts a standalone lowercase `tpad` at the start or end of the human's message (for example, `按方案执行 tpad`) as authorization to bind a unique eligible open same-project match scoring at least 90, or create and bind when complete discovery finds none; multiple qualifying candidates or unresolved write fields require only the missing choice
+- Excludes quoted/embedded marker examples and skill-maintenance discussion; explicit refusal wins, and authorization never transfers to an unrelated delivery
 - Adapts by runtime capability to an installed TAPD skill, authenticated CLI, or environment configuration
 - Ranks up to three matching open work items at session start
-- Binds the session only after user confirmation
+- Binds only after a specific user selection, boundary-marker authorization, or task-scoped workflow authorization, with verified read-back; later stages need no repeated marker
 - Creates valuable follow-up work without repeated TAPD business confirmation while respecting host runtime permissions
 - Records bound delivery phases on the parent through verified configured fields or activity entries, including ordered backfill after a late or restored binding
 - Binds or creates children for every valuable planned or discovered stage outcome before work, then follows progress, blockers, resumption, and verified legal transitions; routine operations remain existing-item progress
@@ -248,6 +249,9 @@ npx skills add roxi3906/the-way-of-roxi --skill tapd-sync --agent codex claude-c
 - After binding, ends applicable final answers with links to the bound parent and relevant children
 - Keeps one TAPD write owner across primary, forked, and compacted contexts
 - Keeps the original task moving when TAPD is unavailable
+- Includes the bound parent and task-scoped children, current states, legal terminal targets and read/write/read-back operations in the cleanup plan; marker authorization does not execute an unreviewed cleanup plan
+
+These are agent workflow checks, not a host-enforced pre-tool hook. Automatic skill discovery and instruction following still depend on the runtime. `tpad` is an authorization convention interpreted by the skill, not a native command.
 
 ### `tapd-summary`
 
@@ -317,6 +321,8 @@ npm run verify
 Focused Roxi's Way behavior checks can be run with `npm run verify:codex -- --case roxis-way-readonly`, `--case roxis-way-authorized`, or `--case roxis-way-negative`. They cover an implicit Chinese code question, two turns sharing explicitly selected strategies, and an unrelated translation. The first two probes ask for decision records and check route, required user choices, and selected branch and verification state where applicable. Use `--case roxis-way-delivery` for PR body language selection (including fork targets, missing evidence, and explicit overrides) and commit-message acceptance. Use `--case roxis-way-concept-negative` and `--case roxis-way-quoted-negative` for general terminology questions and quoted invocations. The existing `roxis-way` and cleanup cases continue to check missing-choice prompts and cleanup approval. These isolated probes do not assess prose quality, execute Git or publish PRs, or prove unrestricted conversation behavior, coactivation with `auto-develop`, or adherence on every host or prompt.
 
 Focused outcome lifecycle probes run with `npm run verify:codex -- --case auto-develop-outcomes` and `--case tapd-sync-outcomes`. Each asks the consuming agent for decisions on planned research and verification, existing-item reuse, blocked/resumed work, code versus non-code completion, completed-outcome restoration, ambiguous workflows, and failed read-back. The generic probe uses a configured non-TAPD tracker. These isolated simulations perform no platform writes and do not establish live integration correctness.
+
+`npm run verify:codex -- --case tapd-sync-task-entry` resumes six turns from analysis through discussion, implementation entry, `tpad` authorization, verification and cleanup planning. `--case tapd-sync-authorization` checks marker boundaries, the 90-point threshold, ambiguous/invalid candidates, refusal, restored notices, separate deliveries, partial-write recovery and cleanup approval. `--case tapd-sync-cleanup-scope` checks that approved cleanup cannot trigger unrelated phase updates or child creation in the final-answer gate. These are no-tool decision simulations: they validate consuming-agent decisions, not live TAPD writes. Local tests additionally verify that their assertions reject missed checkpoints and unauthorized actions.
 
 ## License
 
