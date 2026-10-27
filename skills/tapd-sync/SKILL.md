@@ -227,7 +227,7 @@ When the user confirms creation, or task-scoped marker/workflow authorization pe
 4. Use `【{tapd_project_name.value}】{work_description}` as the title.
 5. Require a resolved `tapd_owner`. If it is unresolved, skip creation, report the non-sensitive reason, and request only missing information that the user can supply while continuing the original task.
 6. Check `tapd_partial_writes` for the top-level logical idempotency key before issuing a create. If a recorded item now passes verification, reuse it and continue at step 9 without creating another item.
-7. Set the owner to `tapd_owner.value`, the start date to the runtime's current date, and the due date to one calendar day later. Calculate dates in the runtime timezone.
+7. Set the owner to `tapd_owner.value` and the due date to one calendar day after the runtime's current date, calculated in the runtime timezone. Omit the expected start date (`begin`) from the create request.
 8. Create a top-level requirement without a parent, then verify the returned or fetched owner and confirm that the item has no parent.
 9. Save the newly created or recovered item as `tapd_binding` with `tapd_project_name.value` and set `tapd_sync_mode` to `bound` only after every required verification succeeds.
 
@@ -287,7 +287,7 @@ For a valuable user request, perform these steps before starting the requested w
 7. Prefer the selected TAPD skill or CLI's generic create-child-requirement operation. Require it to create a requirement in TAPD's unified work-item model, use the item in `tapd_binding` as the parent regardless of its displayed type, and verify the returned parent relationship. Never substitute a legacy task creation operation.
 8. When falling back to HTTP, follow the current official TAPD API and unified work-item model, create the child through `/stories`, and set `parent_id`. Never claim success if the API does not support the current parent relationship.
 9. Dynamically resolve the preferred automatic-child `workitem_type_id` using the purpose-based type rules.
-10. Require a resolved `tapd_owner`. If it is unresolved, skip creation, report the non-sensitive reason, and continue the user's original task. Otherwise set the owner to `tapd_owner.value`, the start date to the runtime's current date, and the due date to one calendar day later.
+10. Require a resolved `tapd_owner`. If it is unresolved, skip creation, report the non-sensitive reason, and continue the user's original task. Otherwise set the owner to `tapd_owner.value` and the due date to one calendar day after the runtime's current date, calculated in the runtime timezone. Omit the expected start date (`begin`) from the create request.
 11. For a newly created child, verify both its returned parent relationship and its returned or fetched owner before treating synchronization as successful.
 12. Add the created or reused item and its corresponding user request or stage outcome to `tapd_session_children`, persist its stable binding and acceptance criteria, then follow its lifecycle while continuing the user's requested work.
 
