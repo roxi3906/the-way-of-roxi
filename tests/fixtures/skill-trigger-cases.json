@@ -372,6 +372,72 @@
         "windsurf": "Use the tapd-summary skill for this request."
       },
       "mayCoactivateWith": []
+    },
+    "os-isolate-dev": {
+      "invocationPolicy": "implicit",
+      "frontloadCharacters": 420,
+      "frontloadedSignalGroups": [
+        [
+          "open-science"
+        ],
+        [
+          "exactly matches"
+        ],
+        [
+          "isolation"
+        ],
+        [
+          "launch-script"
+        ]
+      ],
+      "negativeDescriptionSignalGroups": [
+        [
+          "open-science-usecases"
+        ],
+        [
+          "aipoch-web"
+        ],
+        [
+          "author, translate, or discuss this skill"
+        ]
+      ],
+      "positivePrompts": [
+        "Prepare a development environment for the repository named exactly open-science.",
+        "Simplify the local launch script in the open-science project."
+      ],
+      "paraphrasePrompts": [
+        "Continue the open-science task using the isolated configuration I already approved.",
+        "Verify Notebook repair in our open-science task environment."
+      ],
+      "negativePrompts": [
+        "Prepare an isolated environment for open-science-usecases.",
+        "Create a development launch script for aipoch-web.",
+        "Prepare the Open-Science repository; preserve that exact project name.",
+        "Add a launch script to my-open-science.",
+        "Write an English skill about open-science isolation in the-way-of-roxi.",
+        "Use $os-isolate-dev for the unrelated analytics project."
+      ],
+      "explicitInvocations": {
+        "amp": "/os-isolate-dev",
+        "codex": "$os-isolate-dev",
+        "claude-code": "/os-isolate-dev",
+        "cline": "Use the os-isolate-dev skill for this request.",
+        "cursor": "/os-isolate-dev",
+        "gemini-cli": "Use the os-isolate-dev skill for this request.",
+        "github-copilot": "/os-isolate-dev",
+        "goose": "/skills os-isolate-dev",
+        "kimi-code-cli": "/skill:os-isolate-dev",
+        "kiro-cli": "/os-isolate-dev",
+        "opencode": "/os-isolate-dev",
+        "qwen-code": "/os-isolate-dev",
+        "roo": "Use the os-isolate-dev skill for this request.",
+        "windsurf": "Use the os-isolate-dev skill for this request."
+      },
+      "mayCoactivateWith": [
+        "auto-develop",
+        "roxis-way",
+        "tapd-sync"
+      ]
     }
   }
 }

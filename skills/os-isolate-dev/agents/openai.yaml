@@ -1,0 +1,7 @@
+interface:
+  display_name: "os-isolate-dev"
+  short_description: "Isolated development only for exact open-science projects"
+  default_prompt: "Use $os-isolate-dev only if the target project name exactly equals open-science; preserve this task's isolation choice and separate environment preparation from startup."
+
+policy:
+  allow_implicit_invocation: true

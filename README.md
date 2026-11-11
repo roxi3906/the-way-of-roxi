@@ -31,10 +31,11 @@ skills/<skill-name>/
 
 All skills follow the open Agent Skills specification. The `skills` CLI maps the same canonical skills into the discovery location supported by the selected compatible agent, so this repository does not maintain vendor-specific copies.
 
-It currently ships five skills:
+It currently ships six skills:
 
 - `skills/auto-develop/`: Explicitly invoked autonomous delivery with project-management phase synchronization, implementation, deep review, recommended fixes, a draft PR, and a traceable decision tree.
 - `skills/roxis-way/`: Reusable collaboration, implementation, testing, language, and delivery rules for any user.
+- `skills/os-isolate-dev/`: Task environment isolation, preparation, launch scripts, and verification only for the exact, case-sensitive project name `open-science`.
 - `skills/tapd-sync/`: Session-aware TAPD work-item matching, binding, parent phase progress, selective child creation, and evidence-driven completion.
 - `skills/tapd-summary/`: Explicitly invoked, read-only daily work and next-day plan summaries grouped by project.
 - `skills/visual-companion/` (Visual Companion): Offers optional low-fidelity HTML, project-matched high-fidelity HTML, or mock-only UI/UX changes inside the real project after the normal response.
@@ -45,7 +46,7 @@ The locked `skills` CLI is exercised against a fresh temporary installation for 
 
 | Agent | Project discovery root | Invocation behavior |
 | --- | --- | --- |
-| Codex | `.agents/skills` | `roxis-way`, `tapd-sync`, and `visual-companion` may activate implicitly; use `$skill-name` to select explicitly |
+| Codex | `.agents/skills` | `roxis-way`, `tapd-sync`, `visual-companion`, and project-scoped `os-isolate-dev` may activate implicitly; use `$skill-name` to select explicitly |
 | Claude Code | `.claude/skills` | May activate from the description; use `/skill-name` to select explicitly |
 | Cursor | `.agents/skills` | May activate from the description; use `/skill-name` or name the skill explicitly |
 | Gemini CLI | `.agents/skills` | Discovers relevant skills and may request activation confirmation; name the skill explicitly when needed |
@@ -105,6 +106,10 @@ For each delivery, `auto-develop` synchronizes preparation, technical research, 
     │       ├── decision-ledger.mjs
     │       ├── render-execution-report.mjs
     │       └── serve-execution-report.mjs
+    ├── os-isolate-dev
+    │   ├── SKILL.md
+    │   └── agents
+    │       └── openai.yaml
     ├── roxis-way
     │   ├── SKILL.md
     │   └── agents
@@ -133,7 +138,7 @@ Install one skill for selected agents:
 npx skills add roxi3906/the-way-of-roxi --skill roxis-way --agent codex claude-code cursor gemini-cli github-copilot opencode amp cline goose kiro-cli kimi-code-cli qwen-code roo windsurf --copy -y
 ```
 
-Replace `roxis-way` with `auto-develop`, `tapd-sync`, `tapd-summary`, or `visual-companion` as needed. Inspect all available skills with:
+Replace `roxis-way` with `auto-develop`, `os-isolate-dev`, `tapd-sync`, `tapd-summary`, or `visual-companion` as needed. Inspect all available skills with:
 
 ```bash
 npx skills add roxi3906/the-way-of-roxi --list
