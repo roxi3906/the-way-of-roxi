@@ -226,6 +226,16 @@ test("auto-develop preserves the repository workflow's comment policy", async ()
   assert.doesNotMatch(contents, /Add comments only where the logic would otherwise be difficult to understand\./);
 });
 
+test("os-isolate-dev keeps platform launchers in the same branch-scoped environment", async () => {
+  const contents = await readFile(path.join(skillsRoot, "os-isolate-dev", "SKILL.md"), "utf8");
+
+  assert.match(contents, /`\.dev-isolate\/<branch-name>\/start\.sh`[^\n]+`run dev`/);
+  assert.match(contents, /only when[^\n]+explicitly requests[^\n]+`start-<platform>\.sh`[^\n]+`start-web\.sh`/i);
+  assert.match(contents, /same branch directory/i);
+  assert.match(contents, /identical[^\n]+only the final startup command (?:may )?differ/i);
+  assert.doesNotMatch(contents, /\.dev-isolate\/<task-name>/);
+});
+
 test("roxis-way requires Conventional Commits for every Git commit", async () => {
   const contents = await readFile(path.join(skillsRoot, "roxis-way", "SKILL.md"), "utf8");
   const hardRules = contents.match(/## Hard Rules\n([\s\S]*?)(?=\n## )/)?.[1] ?? "";
