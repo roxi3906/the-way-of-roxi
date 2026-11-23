@@ -229,7 +229,11 @@ test("auto-develop preserves the repository workflow's comment policy", async ()
 test("os-isolate-dev keeps platform launchers in the same branch-scoped environment", async () => {
   const contents = await readFile(path.join(skillsRoot, "os-isolate-dev", "SKILL.md"), "utf8");
 
-  assert.match(contents, /`\.dev-isolate\/<branch-name>\/start\.sh`[^\n]+`run dev`/);
+  assert.match(contents, /final slash-delimited component of the current Git branch/i);
+  assert.match(contents, /`\.dev-isolate\/<purpose-name>\/start\.sh`[^\n]+`run dev`/);
+  assert.match(contents, /`feat\/user\/onboarding-flow` uses `\.dev-isolate\/onboarding-flow\//);
+  assert.match(contents, /collision[^\n]+append a short stable hash derived from the full branch name/i);
+  assert.doesNotMatch(contents, /preserving `\/` as a directory separator/i);
   assert.match(contents, /only when[^\n]+explicitly requests[^\n]+`start-<platform>\.sh`[^\n]+`start-web\.sh`/i);
   assert.match(contents, /same branch directory/i);
   assert.match(contents, /identical[^\n]+only the final startup command (?:may )?differ/i);
