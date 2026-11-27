@@ -167,7 +167,7 @@
         "roo": "Use the auto-develop skill for this request.",
         "windsurf": "Use the auto-develop skill for this request."
       },
-      "mayCoactivateWith": ["roxis-way", "tapd-sync"]
+      "mayCoactivateWith": ["roxis-way", "session-cleanup", "tapd-sync"]
     },
     "roxis-way": {
       "invocationPolicy": "implicit",
@@ -222,7 +222,52 @@
         "roo": "Use the roxis-way skill for this request.",
         "windsurf": "Use the roxis-way skill for this request."
       },
-      "mayCoactivateWith": ["auto-develop", "tapd-sync"]
+      "mayCoactivateWith": ["auto-develop", "session-cleanup", "tapd-sync"]
+    },
+    "session-cleanup": {
+      "invocationPolicy": "implicit",
+      "frontloadCharacters": 420,
+      "frontloadedSignalGroups": [
+        ["session cleanup", "会话清理"],
+        ["merged", "合并"],
+        ["remote and local", "远端和本地"]
+      ],
+      "negativeDescriptionSignalGroups": [
+        ["do not use"],
+        ["open or merely closed"],
+        ["ordinary development"],
+        ["general git"]
+      ],
+      "positivePrompts": [
+        "PR #42 has merged. Clean up the session and delete its remote and local branches.",
+        "PR 已合并，清理会话、开发数据，并归档任务文档。"
+      ],
+      "paraphrasePrompts": [
+        "Clean up the merged delivery's worktree and temporary files after I review the plan.",
+        "合并后的会话清理，先给我按风险等级标注的清单。"
+      ],
+      "negativePrompts": [
+        "Create a branch and implement the feature.",
+        "PR 还没合并，帮我解决评审意见。",
+        "Explain what git branch -d does without cleaning a delivery."
+      ],
+      "explicitInvocations": {
+        "amp": "/session-cleanup",
+        "codex": "$session-cleanup",
+        "claude-code": "/session-cleanup",
+        "cline": "Use the session-cleanup skill for this request.",
+        "cursor": "/session-cleanup",
+        "gemini-cli": "Use the session-cleanup skill for this request.",
+        "github-copilot": "/session-cleanup",
+        "goose": "/skills session-cleanup",
+        "kimi-code-cli": "/skill:session-cleanup",
+        "kiro-cli": "/session-cleanup",
+        "opencode": "/session-cleanup",
+        "qwen-code": "/session-cleanup",
+        "roo": "Use the session-cleanup skill for this request.",
+        "windsurf": "Use the session-cleanup skill for this request."
+      },
+      "mayCoactivateWith": ["auto-develop", "roxis-way", "tapd-sync"]
     },
     "tapd-sync": {
       "invocationPolicy": "implicit",
@@ -277,7 +322,7 @@
         "roo": "Use the tapd-sync skill for this request.",
         "windsurf": "Use the tapd-sync skill for this request."
       },
-      "mayCoactivateWith": ["auto-develop", "roxis-way"]
+      "mayCoactivateWith": ["auto-develop", "roxis-way", "session-cleanup"]
     },
     "visual-companion": {
       "invocationPolicy": "implicit",

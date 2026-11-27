@@ -1,0 +1,7 @@
+interface:
+  display_name: "Session Cleanup"
+  short_description: "Safely clean merged delivery branches and artifacts"
+  default_prompt: "Use $session-cleanup for this merged delivery, verify PR, branch, worktree, ownership and archive evidence, present a risk-tagged plan with exact commands, and execute only after explicit approval."
+
+policy:
+  allow_implicit_invocation: true

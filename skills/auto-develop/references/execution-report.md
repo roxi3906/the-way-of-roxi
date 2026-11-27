@@ -223,6 +223,6 @@ Do not emit a terminal response until this preflight passes.
 
 When the draft PR exists and its state has been read back successfully, keep the worktree path and task branch in the HTML overview, and append this short reminder once in chat:
 
-> PR 合并后，可以让我清理本地开发工作树和任务分支，以释放资源。
+> PR 合并后，可以让我使用 session-cleanup 清理本地开发工作树和任务分支，以释放资源。
 
 For an explicitly requested text-only simulation, retain the worktree metadata and reminder in the text report. Do not present cleanup as part of the current `auto-develop` delivery. A later cleanup request also stops this task's report service before removing its worktree. When PR creation is blocked, omit the reminder: put preserved work and detailed evidence in the report, and state the exact blocker and condition required to resume briefly in chat. Identify a human-only action only when one is actually required.

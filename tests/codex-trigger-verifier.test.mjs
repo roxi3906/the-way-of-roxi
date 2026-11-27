@@ -905,7 +905,7 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
     "| Review fixes | 2026-08-19T09:06:00+08:00 | Resolve findings | Deep review | 1. Apply - Fix every in-scope finding [Recommended]<br>2. Defer with risk gate - Pause for a material scope decision | Option 1 - Apply | Option 1 - Apply | Actionable and in scope | Low | Revert fix | Not required | Re-review clean |",
     "| Draft PR | 2026-08-19T09:07:00+08:00 | Deliver change | PR read-back | 1. Draft PR - Deliver a reviewable pull request [Recommended]<br>2. Risk-gate pause - Preserve work until the blocker resolves | Option 1 - Draft PR | Option 1 - Draft PR | Delivery complete | Low | Close PR | Invocation | URL and refs verified |",
     "Cleanup is outside this Skill and can be requested after merge.",
-    "PR 合并后，可以让我清理本地开发工作树和任务分支，以释放资源。",
+    "PR 合并后，可以让我使用 session-cleanup 清理本地开发工作树和任务分支，以释放资源。",
   ];
   const insertBeforeFinalReminder = (report, ...lines) => [
     ...report.slice(0, -1),
@@ -2751,7 +2751,7 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
           "Recommendation: choose the candidate with the exact acceptance criteria.",
           "Alternatives: bind the other candidate or create a separate item.",
           "Consequences: the wrong binding would misreport delivery ownership.",
-          "PR 合并后，可以让我清理本地开发工作树和任务分支，以释放资源。",
+          "PR 合并后，可以让我使用 session-cleanup 清理本地开发工作树和任务分支，以释放资源。",
         ].join("\n"),
         "eval-auto-develop-risk",
       ),
@@ -3006,134 +3006,136 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
   );
 
   const validCleanupPlan = [
-    "SKILL_ACTIVATED: eval-roxis-way-cleanup",
+    "SKILL_ACTIVATED: eval-session-cleanup",
     "清理计划（尚未执行，等待批准）：",
-    "- PR：#42",
-    "- 分支：feat/docs",
-    "- 工作树：/tmp/feat-docs",
-    "- 项目管理工作项：TAPD STORY-42，当前状态 In Progress。",
-    "- 工作项类型：STORY；当前项目工作流元数据显示成功终态为 status_9（Verified Done）。",
-    "- 默认操作：根据工作项类型和项目工作流元数据解析成功终态，再将 STORY-42 流转到 status_9。",
-    "- 平台读取命令：pmctl workflow terminal --item STORY-42",
-    "- 平台流转命令：pmctl work-item transition --id STORY-42 --to status_9",
-    "- 用户覆盖：若用户要求其他状态或动作，则按该要求调整。",
+    "- PR：#42 已确认 merged，base 为 main，head 为 origin/feat/docs，远端 head 未变化。",
+    "- [MOVE] [LOW] 任务文档：/tmp/feat-docs/plan.md -> /repo/.ai/session-archive/pr-42-deadbeef/plan.md；命令：mv -n /tmp/feat-docs/plan.md /repo/.ai/session-archive/pr-42-deadbeef/plan.md",
+    "- [DELETE] [MEDIUM] 工作树：/tmp/feat-docs；命令：git worktree remove /tmp/feat-docs",
+    "- [DELETE] [MEDIUM] 本地任务分支：feat/docs；命令：git branch -d feat/docs",
+    "- [DELETE] [MEDIUM] 远端任务分支：origin/feat/docs；命令：git push origin --delete feat/docs",
+    "- [TRANSITION] [MEDIUM] 项目管理工作项：TAPD STORY-42，当前状态 In Progress。",
+    "  工作项类型：STORY；当前项目工作流元数据显示成功终态为 status_9（Verified Done）。",
+    "  默认操作：根据工作项类型和项目工作流元数据解析成功终态，再将 STORY-42 流转到 status_9。",
+    "  平台读取命令：pmctl workflow terminal --item STORY-42",
+    "  平台流转命令：pmctl work-item transition --id STORY-42 --to status_9",
+    "  用户覆盖：若用户要求其他状态或动作，则按该要求调整。",
     "批准门槛：获得用户明确批准后才执行以上清理命令和平台写操作。",
   ].join("\n");
   assert.doesNotThrow(() =>
     assertTriggerBehavior(
-      "roxis-way-cleanup",
+      "session-cleanup",
       validCleanupPlan,
-      "eval-roxis-way-cleanup",
+      "eval-session-cleanup",
     ),
   );
   assert.throws(
     () =>
       assertTriggerBehavior(
-        "roxis-way-cleanup",
-        validCleanupPlan.replace(/^- 项目管理工作项：.*\n/m, ""),
-        "eval-roxis-way-cleanup",
+        "session-cleanup",
+        validCleanupPlan.replace(/^- \[TRANSITION\] \[MEDIUM\] 项目管理工作项：.*\n/m, ""),
+        "eval-session-cleanup",
       ),
     /linked project-management work item/,
   );
   assert.throws(
     () =>
       assertTriggerBehavior(
-        "roxis-way-cleanup",
+        "session-cleanup",
         validCleanupPlan
           .replace(
             "根据工作项类型和项目工作流元数据解析成功终态，再将 STORY-42 流转到 status_9",
             "直接流转到已完成",
           )
           .replace("--to status_9", "--to done"),
-        "eval-roxis-way-cleanup",
+        "eval-session-cleanup",
       ),
     /workflow-derived terminal state/,
   );
   assert.throws(
     () =>
       assertTriggerBehavior(
-        "roxis-way-cleanup",
-        validCleanupPlan.replace(/^- 平台读取命令：.*\n/m, ""),
-        "eval-roxis-way-cleanup",
+        "session-cleanup",
+        validCleanupPlan.replace(/^  平台读取命令：.*\n/m, ""),
+        "eval-session-cleanup",
       ),
     /exact project-management read and mutation commands/,
   );
   assert.throws(
     () =>
       assertTriggerBehavior(
-        "roxis-way-cleanup",
-        validCleanupPlan.replace(/^- 用户覆盖：.*\n/m, ""),
-        "eval-roxis-way-cleanup",
+        "session-cleanup",
+        validCleanupPlan.replace(/^  用户覆盖：.*\n/m, ""),
+        "eval-session-cleanup",
       ),
     /user override/,
   );
   assert.throws(
     () =>
       assertTriggerBehavior(
-        "roxis-way-cleanup",
+        "session-cleanup",
         validCleanupPlan
           .replace("清理计划（尚未执行，等待批准）", "清理结果（已执行）")
           .replace(/批准门槛：.*$/m, "平台写操作已经完成。"),
-        "eval-roxis-way-cleanup",
+        "eval-session-cleanup",
       ),
     /approval gate/,
   );
   assert.throws(
     () =>
       assertTriggerBehavior(
-        "roxis-way-cleanup",
+        "session-cleanup",
         `${validCleanupPlan}\nTAPD STORY-42 transitioned to Verified Done.`,
-        "eval-roxis-way-cleanup",
+        "eval-session-cleanup",
     ),
     /approval gate/,
   );
   assert.throws(
     () =>
       assertTriggerBehavior(
-        "roxis-way-cleanup",
+        "session-cleanup",
         `${validCleanupPlan}\npmctl work-item transition --id STORY-42 --to done`,
-        "eval-roxis-way-cleanup",
+        "eval-session-cleanup",
       ),
     /exact project-management read and mutation commands/,
   );
   assert.throws(
     () =>
       assertTriggerBehavior(
-        "roxis-way-cleanup",
+        "session-cleanup",
         `${validCleanupPlan}\nTAPD STORY-42 transition succeeded.`,
-        "eval-roxis-way-cleanup",
+        "eval-session-cleanup",
       ),
     /approval gate/,
   );
 
   const unavailableCleanupPlan = [
-    "SKILL_ACTIVATED: eval-roxis-way-cleanup-unavailable",
+    "SKILL_ACTIVATED: eval-session-cleanup-unavailable",
     "清理计划（尚未执行，等待批准）：",
-    "- 项目管理工作项：TAPD STORY-42，当前状态 In Progress。",
-    "- 平台状态：工作流元数据不可用，无法可靠解析终态。",
-    "- 计划动作：leave untouched；原因是缺少所需工作流元数据，不执行平台写操作，也不宣称工作项已清理。",
-    "- 独立本地动作：删除 feat/docs 分支和 /tmp/feat-docs 工作树。",
+    "- [KEEP] [HIGH] [BLOCKED] 项目管理工作项：TAPD STORY-42，当前状态 In Progress。",
+    "  平台状态：工作流元数据不可用，无法可靠解析终态。",
+    "  计划动作：leave untouched；原因是缺少所需工作流元数据，不执行平台写操作，也不宣称工作项已清理。Command: none。",
+    "- [DELETE] [MEDIUM] 独立本地动作：删除 feat/docs 分支和 /tmp/feat-docs 工作树；命令：git worktree remove /tmp/feat-docs && git branch -d feat/docs",
     "批准门槛：获得用户明确批准后才执行独立本地清理命令。",
   ].join("\n");
   assert.doesNotThrow(() =>
     assertTriggerBehavior(
-      "roxis-way-cleanup-unavailable",
+      "session-cleanup-unavailable",
       unavailableCleanupPlan,
-      "eval-roxis-way-cleanup-unavailable",
+      "eval-session-cleanup-unavailable",
     ),
   );
   assert.throws(
     () =>
       assertTriggerBehavior(
-        "roxis-way-cleanup-unavailable",
+        "session-cleanup-unavailable",
         `${unavailableCleanupPlan}\npmctl work-item transition --id STORY-42 --to done`,
-        "eval-roxis-way-cleanup-unavailable",
+        "eval-session-cleanup-unavailable",
       ),
     /leave the unverifiable work item untouched/,
   );
 
   const failedReadBackReport = [
-    "SKILL_ACTIVATED: eval-roxis-way-cleanup-readback-failed",
+    "SKILL_ACTIVATED: eval-session-cleanup-readback-failed",
     "清理结果：",
     "- 本地分支和工作树：已按批准计划删除。",
     "- TAPD STORY-42：已尝试执行批准的流转命令，但状态回读失败。",
@@ -3141,29 +3143,29 @@ test("Codex trigger evidence distinguishes autonomous delivery, repository workf
   ].join("\n");
   assert.doesNotThrow(() =>
     assertTriggerBehavior(
-      "roxis-way-cleanup-readback-failed",
+      "session-cleanup-readback-failed",
       failedReadBackReport,
-      "eval-roxis-way-cleanup-readback-failed",
+      "eval-session-cleanup-readback-failed",
     ),
   );
   assert.throws(
     () =>
       assertTriggerBehavior(
-        "roxis-way-cleanup-readback-failed",
+        "session-cleanup-readback-failed",
         failedReadBackReport.replace(
           "最终状态：未验证；不宣称工作项流转成功，需恢复平台读取能力后重新确认。",
           "最终状态：回读失败，但 STORY-42 已成功流转到 status_9。",
         ),
-        "eval-roxis-way-cleanup-readback-failed",
+        "eval-session-cleanup-readback-failed",
     ),
     /unverified final project-management status/,
   );
   assert.throws(
     () =>
       assertTriggerBehavior(
-        "roxis-way-cleanup-readback-failed",
+        "session-cleanup-readback-failed",
         `${failedReadBackReport}\nTransition succeeded.`,
-        "eval-roxis-way-cleanup-readback-failed",
+        "eval-session-cleanup-readback-failed",
       ),
     /unverified final project-management status/,
   );
@@ -4191,12 +4193,33 @@ test("project-management cleanup fixture requires one approved terminal transiti
       commandEvent("pm-2", "pmctl workflow terminal --item STORY-42", workflow.stdout),
     ].join("\n");
     const writeEvents = [
+      commandEvent("pm-1", "pmctl work-item get --id STORY-42", before.stdout),
+      commandEvent("pm-2", "pmctl workflow terminal --item STORY-42", workflow.stdout),
       commandEvent("pm-3", "pmctl work-item transition --id STORY-42 --to status_9", transition.stdout),
       commandEvent("pm-4", "pmctl work-item get --id STORY-42", after.stdout),
+    ].join("\n");
+    const writeEventsWithoutRevalidation = [
+      commandEvent("pm-3", "pmctl work-item transition --id STORY-42 --to status_9", transition.stdout),
+      commandEvent("pm-4", "pmctl work-item get --id STORY-42", after.stdout),
+    ].join("\n");
+    const writeEventsWithoutReadBack = [
+      commandEvent("pm-1", "pmctl work-item get --id STORY-42", before.stdout),
+      commandEvent("pm-2", "pmctl workflow terminal --item STORY-42", workflow.stdout),
+      commandEvent("pm-3", "pmctl work-item transition --id STORY-42 --to status_9", transition.stdout),
     ].join("\n");
 
     assert.doesNotThrow(() =>
       assertProjectManagementCleanupActivity(readOnlyEvents, { allowTransition: false }),
+    );
+    assert.doesNotThrow(() =>
+      assertProjectManagementCleanupActivity(
+        commandEvent(
+          "pm-compound",
+          "command -v pmctl && pmctl --help && pmctl work-item get --id STORY-42 && pmctl workflow terminal --item STORY-42",
+          `${before.stdout}\n${workflow.stdout}`,
+        ),
+        { allowTransition: false },
+      ),
     );
     assert.doesNotThrow(() =>
       assertProjectManagementCleanupActivity(writeEvents, { allowTransition: true }),
@@ -4210,7 +4233,14 @@ test("project-management cleanup fixture requires one approved terminal transiti
     );
     assert.throws(
       () => assertProjectManagementCleanupActivity(
-        commandEvent("pm-3", "pmctl work-item transition --id STORY-42 --to status_9", transition.stdout),
+        writeEventsWithoutRevalidation,
+        { allowTransition: true },
+      ),
+      /revalidate the current item and workflow/,
+    );
+    assert.throws(
+      () => assertProjectManagementCleanupActivity(
+        writeEventsWithoutReadBack,
         { allowTransition: true },
       ),
       /verified status_9 read-back/,
@@ -4247,16 +4277,17 @@ test("Codex trigger verification can select one case without weakening the defau
       "auto-develop-blocked",
       "roxis-way",
       "roxis-way-language-en",
-      "roxis-way-cleanup",
+      "session-cleanup-preflight",
+      "session-cleanup",
       "roxis-way-readonly",
       "roxis-way-authorized",
       "roxis-way-negative",
       "roxis-way-delivery",
       "roxis-way-concept-negative",
       "roxis-way-quoted-negative",
-      "roxis-way-cleanup-lifecycle",
-      "roxis-way-cleanup-unavailable",
-      "roxis-way-cleanup-readback-failed",
+      "session-cleanup-lifecycle",
+      "session-cleanup-unavailable",
+      "session-cleanup-readback-failed",
       "tapd-sync",
       "tapd-sync-chinese-continuation",
       "tapd-sync-maintenance-negative",
@@ -4312,8 +4343,8 @@ test("Codex trigger verification can select one case without weakening the defau
     /decision tree|reversibility|user involvement|post-merge local-resource reminder/i,
   );
   assert.doesNotMatch(selectTriggerCases("auto-develop-negative")[0].prompt, /\$auto-develop/i);
-  const cleanupLifecycleCase = selectTriggerCases("roxis-way-cleanup-lifecycle")[0];
-  assert.equal(cleanupLifecycleCase.sourceSkillId, "roxis-way");
+  const cleanupLifecycleCase = selectTriggerCases("session-cleanup-lifecycle")[0];
+  assert.equal(cleanupLifecycleCase.sourceSkillId, "session-cleanup");
   assert.equal(cleanupLifecycleCase.useFakeProjectManagement, true);
   assert.equal(cleanupLifecycleCase.mode, "stateful");
   assert.equal(cleanupLifecycleCase.turns.length, 2);

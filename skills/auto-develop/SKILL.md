@@ -164,7 +164,7 @@ Before successful closeout, reconcile every planned or discovered valuable outco
 
 Default chat closeout is one short outcome sentence and one compact line linking the verified live report, absolute offline HTML and original JSON paths, and verified draft PR when available. Check service status first; use the snapshot if stopped. Add one short sentence for a blocker, material residual risk, or required user action. Keep full evidence, implementation lists, tests/counts/commands, review details, decisions, and worktree metadata in HTML, without recap headings or bullets in chat. Expand for requested detail or text-only output, or if report delivery fails; disclose missing artifacts rather than claiming or linking them.
 
-After verified draft-PR creation, append once: “PR 合并后，可以让我清理本地开发工作树和任务分支，以释放资源。” Cleanup follows the user's existing workflow, without requiring another `auto-develop` invocation. A later cleanup request also stops this task's report service through the documented status/stop commands, never unrelated processes.
+After verified draft-PR creation, append once: “PR 合并后，可以让我使用 session-cleanup 清理本地开发工作树和任务分支，以释放资源。” Cleanup follows `session-cleanup`, without requiring another `auto-develop` invocation. A later cleanup request also stops this task's report service through the documented status/stop commands, never unrelated processes.
 
 End the delivery only after a verified draft PR and traceable report, or an unavoidable risk-gate pause for user action, a material decision, or an exhausted external dependency. Completion and pauses never deactivate session mode.
 
