@@ -31,10 +31,11 @@ skills/<skill-name>/
 
 All skills follow the open Agent Skills specification. The `skills` CLI maps the same canonical skills into the discovery location supported by the selected compatible agent, so this repository does not maintain vendor-specific copies.
 
-It currently ships six skills:
+It currently ships seven skills:
 
 - `skills/auto-develop/`: Explicitly invoked autonomous delivery with project-management phase synchronization, implementation, deep review, recommended fixes, a draft PR, and a traceable decision tree.
 - `skills/roxis-way/`: Reusable collaboration, implementation, testing, language, and delivery rules for any user.
+- `skills/session-cleanup/`: Evidence-gated merged-delivery cleanup with remote and local branch deletion, document archiving, development-data review, risk-tagged plans, explicit approval, and read-back.
 - `skills/os-isolate-dev/`: Task environment isolation, preparation, launch scripts, and verification only for the exact, case-sensitive project name `open-science`.
 - `skills/tapd-sync/`: Session-aware TAPD work-item matching, binding, parent phase progress, selective child creation, and evidence-driven completion.
 - `skills/tapd-summary/`: Explicitly invoked, read-only daily work and next-day plan summaries grouped by project.
@@ -46,7 +47,7 @@ The locked `skills` CLI is exercised against a fresh temporary installation for 
 
 | Agent | Project discovery root | Invocation behavior |
 | --- | --- | --- |
-| Codex | `.agents/skills` | `roxis-way`, `tapd-sync`, `visual-companion`, and project-scoped `os-isolate-dev` may activate implicitly; use `$skill-name` to select explicitly |
+| Codex | `.agents/skills` | `roxis-way`, `session-cleanup`, `tapd-sync`, `visual-companion`, and project-scoped `os-isolate-dev` may activate implicitly; use `$skill-name` to select explicitly |
 | Claude Code | `.claude/skills` | May activate from the description; use `/skill-name` to select explicitly |
 | Cursor | `.agents/skills` | May activate from the description; use `/skill-name` or name the skill explicitly |
 | Gemini CLI | `.agents/skills` | Discovers relevant skills and may request activation confirmation; name the skill explicitly when needed |
@@ -114,6 +115,10 @@ For each delivery, `auto-develop` synchronizes preparation, technical research, 
     │   ├── SKILL.md
     │   └── agents
     │       └── openai.yaml
+    ├── session-cleanup
+    │   ├── SKILL.md
+    │   └── agents
+    │       └── openai.yaml
     ├── tapd-sync
     │   ├── SKILL.md
     │   └── agents
@@ -138,7 +143,7 @@ Install one skill for selected agents:
 npx skills add roxi3906/the-way-of-roxi --skill roxis-way --agent codex claude-code cursor gemini-cli github-copilot opencode amp cline goose kiro-cli kimi-code-cli qwen-code roo windsurf --copy -y
 ```
 
-Replace `roxis-way` with `auto-develop`, `os-isolate-dev`, `tapd-sync`, `tapd-summary`, or `visual-companion` as needed. Inspect all available skills with:
+Replace `roxis-way` with `auto-develop`, `os-isolate-dev`, `session-cleanup`, `tapd-sync`, `tapd-summary`, or `visual-companion` as needed. Inspect all available skills with:
 
 ```bash
 npx skills add roxi3906/the-way-of-roxi --list
@@ -179,7 +184,7 @@ npx skills add roxi3906/the-way-of-roxi --skill auto-develop --agent codex claud
 - Serves a live HTML report through a task-owned mini Node service with start/status/stop commands, automatic JSON refresh, and an offline snapshot; includes repository/worktree/PR metadata, timestamped review findings and fixes, and a complete decision timeline with a clickable outline
 - Keeps report presentation inputs separate from the unchanged version-1 decision ledger; links both the HTML and original private JSON in the delivery response
 - Shows the parent task directly below the report summary and related child tasks below stage, review, and key decision headings; both task titles and explicitly labeled platform workflow statuses are clickable in live and offline reports, with honest missing-link reasons
-- Reminds the user that local worktree and branch cleanup can be requested after merge; cleanup is outside this Skill
+- Reminds the user to use `session-cleanup` after merge; cleanup remains outside this Skill
 
 ### `roxis-way`
 
@@ -201,21 +206,50 @@ npx skills add roxi3906/the-way-of-roxi --skill roxis-way --agent codex claude-c
 `roxis-way` defines defaults for:
 
 - Intent-based activation from repository context, including implicit follow-ups and Chinese requests; an unrelated request inside a repository stays outside the workflow
-- Separate routes for read-only answers, artifact changes, task continuation, Git delivery, and merged-delivery cleanup
+- Separate routes for read-only answers, artifact changes, task continuation, and Git delivery, with merged-delivery cleanup delegated to `session-cleanup`
 - Reuse of established workspace, validation, and action-specific authorization, including the scoped choices supplied by explicitly selected `auto-develop`
-- Action checkpoints before writing, validating, Git operations, cleanup, and reporting; unrun checks remain unverified
+- Action checkpoints before writing, validating, Git operations, cleanup routing, and reporting; unrun checks remain unverified
 - English skill source with replies, questions, progress updates, and reports in the user's preferred language
 - Context-aware language selection for each output destination
 - Planning artifact placement
 - Conventional Commits for every newly created commit, including automatic merge/revert subjects
 - English PR bodies for open-source targets and Simplified Chinese bodies for private targets, with explicit user and binding destination requirements taking precedence; classify the upstream target for fork contributions
 - Git conventions and PR authorization
-- Post-merge cleanup approval, bound project-management work-item transitions, and scope limits
+- Post-merge cleanup routing to `session-cleanup`, with bound project-management evidence preserved through `tapd-sync`
 - Product language selection
 - Frontend coding style
 - Comment language
 - Third-party package installation preference
 - Delivery verification expectations
+
+### `session-cleanup`
+
+```bash
+npx skills add roxi3906/the-way-of-roxi --skill session-cleanup --copy
+```
+
+<details>
+<summary>Install for all 14 supported agents</summary>
+
+Keep only the agents you use after `--agent`:
+
+```bash
+npx skills add roxi3906/the-way-of-roxi --skill session-cleanup --agent codex claude-code cursor gemini-cli github-copilot opencode amp cline goose kiro-cli kimi-code-cli qwen-code roo windsurf --copy -y
+```
+
+</details>
+
+`session-cleanup` owns the complete merged-delivery cleanup lifecycle:
+
+- Matches session-cleanup intent across English and Chinese, with explicit invocation available on every supported host
+- Verifies the hosting platform's merged state, PR base and head identities, unchanged remote head, local ancestry, worktree cleanliness and occupancy, and delivery ownership before proposing mutations
+- Includes separate remote head-branch and local task-branch deletion entries whenever every safety check passes; never treats a merely closed PR as merged
+- Blocks core Git, worktree, and document cleanup as a unit when any core gate fails; an unavailable bound work item does not block independently safe local cleanup
+- Moves task-private documents and durable audit evidence into `.ai/session-archive/<delivery-id>/` under the main repository, verifying Git isolation and refusing overwrites
+- Deletes only verified task-owned reproducible development data; preserves product documentation, unknown files, non-reproducible data, and binding evidence
+- Marks every plan item with an action tag and `[LOW]`, `[MEDIUM]`, or `[HIGH]`, adding `[BLOCKED]` when a safety gate fails
+- Lists exact commands and recovery notes, waits for explicit approval of the concrete plan, revalidates state before mutation, and reads back every result
+- Includes confirmed `tapd-sync` parent and child work items without discovering new bindings or executing unapproved transitions
 
 ### `tapd-sync`
 
@@ -323,7 +357,7 @@ npm run verify
 
 `npm test` validates structured metadata, host invocation profiles, positive and negative trigger contracts, manual-only controls, per-agent installations for all 14 supported agents, and the combined `--copy` quick-install path across every documented catalog root. Installation verification parses each copied `auto-develop` bundle and requires the portable intent contract plus the `disable-model-invocation`, OpenCode, and Codex native controls to survive unchanged. `npm run verify:codex` additionally launches fresh, isolated, read-only Codex sessions for explicit and negative Auto Develop behavior, the repository workflow, TAPD Sync lifecycle, and explicit-only summary behavior. Single-turn cases remain ephemeral. The Auto Develop stateful case resumes one temporary session from a durable-ledger midpoint through a final report, a separate delivery, risk-gate pause and continuation, and an ordinary question; it then opens a fresh thread with an inherited parent summary and verifies that the earlier activation does not carry over. The TAPD Sync lifecycle case separately resumes one temporary session across the first match, a dormant reply, and candidate selection. Capable-adapter cases expose only a bundled read-only TAPD fixture and reject non-TAPD commands or write-like TAPD commands, while unavailable and negative cases reject all tool activity. The online smoke copies only the current `CODEX_HOME` authentication into an isolated temporary home, exposes no host credentials or live TAPD configuration to model tools, and fails clearly when Codex is not authenticated. Runtime activation behavior for other agents is documented from their product guidance; this repository verifies their locked CLI installation artifacts rather than launching authenticated sessions for every product.
 
-Focused Roxi's Way behavior checks can be run with `npm run verify:codex -- --case roxis-way-readonly`, `--case roxis-way-authorized`, or `--case roxis-way-negative`. They cover an implicit Chinese code question, two turns sharing explicitly selected strategies, and an unrelated translation. The first two probes ask for decision records and check route, required user choices, and selected branch and verification state where applicable. Use `--case roxis-way-delivery` for PR body language selection (including fork targets, missing evidence, and explicit overrides) and commit-message acceptance. Use `--case roxis-way-concept-negative` and `--case roxis-way-quoted-negative` for general terminology questions and quoted invocations. The existing `roxis-way` and cleanup cases continue to check missing-choice prompts and cleanup approval. These isolated probes do not assess prose quality, execute Git or publish PRs, or prove unrestricted conversation behavior, coactivation with `auto-develop`, or adherence on every host or prompt.
+Focused Roxi's Way behavior checks can be run with `npm run verify:codex -- --case roxis-way-readonly`, `--case roxis-way-authorized`, or `--case roxis-way-negative`. They cover an implicit Chinese code question, two turns sharing explicitly selected strategies, and an unrelated translation. The first two probes ask for decision records and check route, required user choices, and selected branch and verification state where applicable. Use `--case roxis-way-delivery` for PR body language selection (including fork targets, missing evidence, and explicit overrides) and commit-message acceptance. Use `--case roxis-way-concept-negative` and `--case roxis-way-quoted-negative` for general terminology questions and quoted invocations. The existing `roxis-way` cases continue to check missing-choice prompts. The `session-cleanup` cases check cleanup approval, workflow-derived work-item transitions and read-back failures; `--case session-cleanup-preflight` also covers normal and fork merges, closed-unmerged PRs, post-merge branch advancement, dirty worktrees, protected branches, unpushed local commits, archive collisions, and missing archive ignore rules, while `--case session-cleanup` checks risk-tagged remote and local branch deletion plus no-overwrite document archiving. These isolated probes do not assess prose quality, execute Git or publish PRs, or prove unrestricted conversation behavior, coactivation with `auto-develop`, or adherence on every host or prompt.
 
 Focused outcome lifecycle probes run with `npm run verify:codex -- --case auto-develop-outcomes` and `--case tapd-sync-outcomes`. Each asks the consuming agent for decisions on planned research and verification, existing-item reuse, blocked/resumed work, code versus non-code completion, completed-outcome restoration, ambiguous workflows, and failed read-back. The generic probe uses a configured non-TAPD tracker. These isolated simulations perform no platform writes and do not establish live integration correctness.
 

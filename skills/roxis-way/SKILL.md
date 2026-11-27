@@ -22,7 +22,7 @@ Maintain this skill's instructions and metadata in English. This authoring conve
 | Create or revise a file, plan, code, test, or other project artifact | Collaboration, Output Language Selection, then the relevant implementation sections | Resolve only missing start choices before writing. A private plan is still an artifact. |
 | Continue the same task or report its status | The current task's route and recorded choices | Resume the existing workspace and validation scope; a status question does not start another delivery. |
 | Commit, push, or prepare a PR | Git And PR Conventions and Delivery Workflow | Verify the authorization for the particular action and retain an already selected PR base. |
-| Clean up a merged delivery | Post-Merge Cleanup Constraints | Prepare or execute the specifically approved cleanup plan; do not ask development-start questions. |
+| Clean up a merged delivery | `session-cleanup` | Yield the entire cleanup route to `session-cleanup`; do not ask development-start questions or duplicate its cleanup plan. |
 
 If a read-only request later becomes an edit, resolve the missing edit choices at that transition. Do not carry another task's workspace selection or permissions into a new delivery merely because it uses the same repository.
 
@@ -41,7 +41,7 @@ An explicit instruction to use this skill activates it for the requested scope. 
 - **Before writing:** Confirm the task route, destination language, selected workspace, and scope. Preserve unrelated changes. Read only the relevant conditional sections below.
 - **At task tracking entry:** For a concrete analysis/feasibility result and immediately before the first implementation edit or execution action, consult the available `tapd-sync` skill and apply its task-entry checkpoint, even if earlier analysis never loaded it. Pass the same delivery identity, actual notice/refusal state, existing binding and task-scoped authorization. Continuing discussion is not execution entry; approving the implementation proposal is. A boundary `tpad` in the human's message uses that skill's automatic matching/creation authorization, without another binding approval. Never infer authorization from quoted marker examples or skill maintenance. If the skill is unavailable, continue the repository task and disclose the unavailable checkpoint once; do not invent TAPD operations.
 - **Before validation:** State the changed behavior and selected coverage; run the actual checks and retain command results. For a read-only answer, cite inspected evidence and limitations without inventing a test requirement.
-- **Before Git or cleanup actions:** Confirm action-specific authorization, Conventional Commits where applicable, the selected PR base, or the exact approved cleanup plan.
+- **Before Git actions:** Confirm action-specific authorization, Conventional Commits where applicable, and the selected PR base. Route merged-delivery cleanup to `session-cleanup` before any cleanup action.
 - **Before reporting:** Compare the result against the request and observed evidence. Separate implemented, verified, not run, and blocked states. Never turn a proposed command, previous run, or another agent's assertion into a passing result. Fix a missed applicable rule before proceeding, or explain the concrete blocker.
 
 ## Apply Across Agent Runtimes
@@ -60,8 +60,7 @@ An explicit instruction to use this skill activates it for the requested scope. 
 - Require every Git commit created during the task to follow Conventional Commits.
 - Write PR bodies in English for open-source target repositories and Simplified Chinese for private target repositories, subject to applicable explicit user or binding destination requirements. Apply the repository classification rules in Git And PR Conventions before drafting.
 - Only create pull requests after the user gives an explicit instruction for that exact action.
-- Before cleanup after a pull request or feature has been merged, prepare a cleanup plan that lists the development contents and confirmed bound project-management work items involved, plus the exact cleanup script or commands, then submit them to the user for review before execution.
-- During post-merge delivery cleanup, only touch items and run commands that were included in the user's reviewed cleanup plan.
+- Route every merged-delivery cleanup request to `session-cleanup`; this Skill does not own cleanup planning or execution.
 - Only move in-progress plans into tracked shared docs when the user explicitly asks for a shared or long-term document.
 - For product-facing text, use the destination's established language and only fall back to English when no applicable local evidence exists.
 - Before reporting a change as verified, run the selected e2e or closest substitute validation; if the user selected "Other" for validation without details, choose the coverage scope based on risk and state that choice.
@@ -165,21 +164,11 @@ Trigger: Apply this section when committing, naming branches, force-adding ignor
 - Associate relevant assignees with the pull request when assignee information is available.
 - Include a separate authors section at the bottom of the pull request body, with its heading written in the selected body language.
 
-## Post-Merge Cleanup Constraints
+## Merged-Delivery Cleanup Routing
 
-Trigger: Apply this section when cleaning up after a pull request or completed feature has been merged, including deleting branches, removing worktrees, pruning local files, deleting temporary artifacts, archiving or renaming related threads, transitioning bound project-management work items, or running any cleanup script for that delivery.
+Trigger: Apply this section when a request concerns cleaning up after a merged pull request or completed feature, including branches, worktrees, local files, temporary artifacts, threads, bound project-management work items, or cleanup scripts.
 
-- Before cleanup, prepare a cleanup plan for the user's review. The plan MUST list the delivery contents that make cleanup relevant, including the PR identifier or branch when available, local branches, worktrees, temporary planning artifacts, generated files, scripts, commands, repository files that the delivery created, modified, or used, and every confirmed project-management work item bound to that delivery.
-- Determine bound work items from existing session or delivery binding records, PR metadata, task artifacts, or explicit user context. Do not discover or infer a new binding merely because an unbound item looks related during cleanup.
-- Include the TAPD parent and task-scoped children recorded by `tapd-sync`, including marker-authorized bindings and bindings retained after tracking was suspended. The `tpad` marker does not approve execution of a cleanup plan. Keep binding and pending-transition evidence recoverable outside any worktree or artifact being removed until read-back completes; do not close unrelated children or a parent that still covers unfinished work outside this delivery.
-- For each bound work item, list its platform, stable identifier or link, current status, proposed action and target status, and the exact read and mutation commands or platform operations. If the item is nonterminal and the user gives no different requirement, default the proposed action to transition it to a successful terminal state resolved from that project's current workflow and the item's work-item type. Never assume a status label such as `Done` or its localized equivalent is universally terminal.
-- A user's cleanup-specific requirement for a bound work item overrides the default terminal transition. Reflect the requested status or action in the reviewed plan before performing it.
-- If the platform or required workflow metadata is unavailable, mark the work item as leave untouched with the reason, do not claim it was cleaned up, and continue with other independent items already covered by the reviewed plan.
-- Include the exact cleanup script or command sequence with the cleanup plan, and wait for the user's explicit approval before executing it.
-- The cleanup plan MUST identify each item as delete, keep, archive, move, transition, or leave untouched, and explain why that action belongs to this delivery's cleanup.
-- During cleanup, only act on items and commands included in the reviewed cleanup plan. Do not delete, move, reset, prune, archive, transition, or otherwise modify any branch, worktree, file, thread, automation, project-management work item, or artifact outside the approved plan.
-- If cleanup reveals new items or requires different commands, stop and submit an updated cleanup plan and script for the user's review before continuing.
-- After cleanup, report which planned items were completed and any approved items left unchanged. Read back every attempted project-management transition. Report its final status as verified only when that read-back succeeds; otherwise report the final status as unverified without treating other successful cleanup actions as evidence that the transition succeeded.
+Yield the entire cleanup route to `session-cleanup`. Do not prepare or execute a separate cleanup plan under this Skill. `session-cleanup` owns merge and ownership detection, the consolidated risk-tagged plan, exact commands, explicit approval, execution, and read-back. `tapd-sync` continues to supply confirmed bindings and approved work-item operations without creating new matches.
 
 ## Product Language
 
